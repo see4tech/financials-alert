@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import defaultRegistry from './registry.json';
 
 export interface IndicatorConfig {
   key: string;
@@ -43,7 +44,8 @@ export class RegistryService {
         continue;
       }
     }
-    throw new Error('Could not load registry.json from any candidate path');
+    // Fallback: use registry bundled with the package (required for Netlify/serverless where file paths differ)
+    this.config = (defaultRegistry as RegistryFile).indicators;
   }
 
   getAll(): IndicatorConfig[] {
