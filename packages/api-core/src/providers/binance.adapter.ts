@@ -11,6 +11,10 @@ export class BinanceAdapter implements ProviderAdapter {
     const res = await fetch(`${BINANCE_TICKER}BTCUSDT`);
     if (!res.ok) {
       if (res.status === 429) throw new Error('Binance rate limit');
+      if (res.status === 451) {
+      console.warn('Binance 451: unavailable in this region/datacenter (crypto.btc skipped)');
+      return [];
+    }
       throw new Error(`Binance ${res.status}`);
     }
     const data = (await res.json()) as { price: string };

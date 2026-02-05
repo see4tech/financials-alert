@@ -2,12 +2,19 @@ import { getSupabase } from './supabase-client';
 
 type Where = Record<string, unknown>;
 
+function toError(e: unknown): Error {
+  if (e instanceof Error) return e;
+  if (e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string')
+    return new Error((e as { message: string }).message);
+  return new Error(String(e));
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyWhere(sb: any, where?: Where): any {
   if (!where) return sb;
   let q = sb;
   for (const [key, value] of Object.entries(where)) {
-    if (value === undefined) continue;
+    if (value === undefined || value === 'undefined') continue;
     // TypeORM FindOperator: MoreThanOrEqual etc. have .value at runtime
     if (value !== null && typeof value === 'object' && 'value' in value) {
       const v = (value as { value: unknown }).value;
@@ -35,9 +42,10 @@ function rowToEntity<T>(row: Record<string, unknown>, dateKeys: string[] = ['ts'
 }
 
 function entityToRow(entity: Record<string, unknown>, dateKeys: string[] = ['ts']): Record<string, unknown> {
-  const out = { ...entity };
-  for (const k of dateKeys) {
-    if (out[k] instanceof Date) out[k] = (out[k] as Date).toISOString();
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(entity)) {
+    if (v === undefined || v === 'undefined') continue;
+    out[k] = dateKeys.includes(k) && v instanceof Date ? v.toISOString() : v;
   }
   return out;
 }
@@ -107,7 +115,7 @@ export function createSupabaseDb(): {
         q = q.order(orderKey, { ascending: asc });
         if (opts?.take) q = q.limit(opts.take);
         const { data, error } = (await q) as { data: Record<string, unknown>[] | null; error: Error | null };
-        if (error) throw error;
+        if (error) throw toError(error);
         return (data ?? []).map((r: Record<string, unknown>) => rowToEntity(r, dateKeys));
       },
       async findOne(opts?: { where?: Where; order?: { ts?: 'ASC' | 'DESC'; week_start_date?: 'ASC' | 'DESC'; id?: 'ASC' | 'DESC' } }) {
@@ -117,25 +125,26 @@ export function createSupabaseDb(): {
         const asc = (orderEntry?.[1] ?? 'DESC') === 'ASC';
         q = q.order(orderKey, { ascending: asc }).limit(1);
         const { data, error } = (await q) as { data: Record<string, unknown>[] | null; error: Error | null };
-        if (error) throw error;
+        if (error) throw toError(error);
         const row = (data ?? [])[0];
         return row ? rowToEntity(row as Record<string, unknown>, dateKeys) : null;
       },
       async save(entity: Record<string, unknown>) {
         const row = entityToRow(entity, dateKeys);
-        if (row.id) {
-          const { data, error } = await supabase.from(table).update(row).eq('id', row.id).select().single();
-          if (error) throw error;
+        const id = row.id;
+        if (id && id !== 'undefined') {
+          const { data, error } = await supabase.from(table).update(row).eq('id', id).select().single();
+          if (error) throw toError(error);
           return rowToEntity(data as Record<string, unknown>, dateKeys);
         }
         const { data, error } = await supabase.from(table).insert(row).select().single();
-        if (error) throw error;
+        if (error) throw toError(error);
         return rowToEntity(data as Record<string, unknown>, dateKeys);
       },
       async remove(entity: Record<string, unknown>) {
         if (!entity.id) return;
         const { error } = await supabase.from(table).delete().eq('id', entity.id);
-        if (error) throw error;
+        if (error) throw toError(error);
       },
       ...(insertOrIgnore
         ? {
@@ -145,7 +154,7 @@ export function createSupabaseDb(): {
                 onConflict: conflictColumns,
                 ignoreDuplicates: true,
               });
-              if (error) throw error;
+              if (error) throw toError(error);
             },
           }
         : {}),
