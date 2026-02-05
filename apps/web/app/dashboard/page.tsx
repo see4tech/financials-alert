@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
-import { fetchDashboard, fetchScoreHistory } from '@/lib/api';
+import { fetchDashboard, fetchScoreHistory, triggerRunJobs } from '@/lib/api';
 
 type Indicator = { key: string; value?: number; trend: string; status: string; explain?: string };
 type Dashboard = {
@@ -13,14 +13,22 @@ type Dashboard = {
   scenario: { bull: string; bear: string };
 };
 
+function refreshData(): Promise<[Dashboard, { data: { week_start_date: string; score: number }[] }]> {
+  return Promise.all([fetchDashboard(), fetchScoreHistory('12w')]);
+}
+
 export default function DashboardPage() {
   const [data, setData] = useState<Dashboard | null>(null);
   const [scoreHistory, setScoreHistory] = useState<{ week_start_date: string; score: number }[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [runJobsLoading, setRunJobsLoading] = useState(false);
+  const [runJobsError, setRunJobsError] = useState<string | null>(null);
+  const [cronSecretPrompt, setCronSecretPrompt] = useState(false);
+  const [cronSecretInput, setCronSecretInput] = useState('');
 
   useEffect(() => {
-    Promise.all([fetchDashboard(), fetchScoreHistory('12w')])
+    refreshData()
       .then(([d, sh]) => {
         setData(d);
         setScoreHistory(sh.data || []);
@@ -28,6 +36,28 @@ export default function DashboardPage() {
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
   }, []);
+
+  const runJobsNow = useCallback(
+    async (secret?: string) => {
+      setRunJobsError(null);
+      setRunJobsLoading(true);
+      try {
+        await triggerRunJobs(secret);
+        setCronSecretPrompt(false);
+        setCronSecretInput('');
+        const [d, sh] = await refreshData();
+        setData(d);
+        setScoreHistory(sh.data || []);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('Cron secret required')) setCronSecretPrompt(true);
+        else setRunJobsError(msg);
+      } finally {
+        setRunJobsLoading(false);
+      }
+    },
+    [],
+  );
 
   if (loading) return <div className="p-8">Loading...</div>;
   if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
@@ -45,8 +75,53 @@ export default function DashboardPage() {
         <Link href="/alerts" className="text-blue-600 hover:underline">Alerts</Link>
       </nav>
 
-      <h1 className="text-2xl font-bold mb-4">Dashboard</h1>
-      <p className="text-sm text-gray-500 mb-6">As of: {new Date(data.asOf).toLocaleString()}</p>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-1">As of: {new Date(data.asOf).toLocaleString()}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => runJobsNow()}
+            disabled={runJobsLoading}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {runJobsLoading ? 'Running…' : 'Run jobs now'}
+          </button>
+          {runJobsError && <p className="text-sm text-red-600">{runJobsError}</p>}
+        </div>
+      </div>
+      {cronSecretPrompt && (
+        <div className="mb-6 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">
+          <label htmlFor="cron-secret" className="text-sm font-medium">
+            Cron secret (CRON_SECRET in Netlify):
+          </label>
+          <input
+            id="cron-secret"
+            type="password"
+            value={cronSecretInput}
+            onChange={(e) => setCronSecretInput(e.target.value)}
+            placeholder="Enter secret"
+            className="rounded border border-amber-300 px-2 py-1 text-sm"
+          />
+          <button
+            type="button"
+            onClick={() => runJobsNow(cronSecretInput)}
+            disabled={runJobsLoading || !cronSecretInput.trim()}
+            className="rounded bg-amber-600 px-3 py-1 text-sm text-white hover:bg-amber-700 disabled:opacity-50"
+          >
+            Run with secret
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCronSecretPrompt(false); setRunJobsError(null); }}
+            className="text-sm underline"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="border rounded-lg p-4 bg-white shadow-sm">
