@@ -68,6 +68,28 @@ Dashboard, scoring, and alerts for the Weekly Market Health Checklist (macro, eq
 
    Web runs at http://localhost:3001. Set `NEXT_PUBLIC_API_URL=http://localhost:3000` in `.env` or `.env.local` in `apps/web` if needed.
 
+## Data sources (by indicator)
+
+| Indicator      | Source        | API key / notes |
+|----------------|---------------|------------------|
+| **macro.us10y** | FRED (DGS10)  | `FRED_API_KEY` (free at fred.stlouisfed.org) |
+| **macro.dxy**  | Twelve Data   | `TWELVE_DATA_API_KEY` (free tier) |
+| **eq.nasdaq**  | Twelve Data   | `TWELVE_DATA_API_KEY` |
+| **eq.leaders** | Twelve Data   | NVDA, MSFT, AAPL, GOOGL |
+| **crypto.btc** | **CoinGecko** (primary), Binance (fallback) | No key for CoinGecko; works from any region. Binance often returns 451 from serverless (Netlify/AWS). |
+| **sent.fng**   | Alternative.me | No key; Fear & Greed index |
+
+BTC was previously Binance-only; Binance returns **451 Unavailable For Legal Reasons** from many datacenter IPs (e.g. Netlify). The app now uses **CoinGecko** first for `crypto.btc` (free, no key, no regional block).
+
+## Where to set API keys
+
+There is **no UI in the app** to store API keys. They are **server-only** and must be set in your hosting environment so they are never exposed to the browser.
+
+- **On Netlify:** Site configuration → Environment variables. Add `FRED_API_KEY`, `TWELVE_DATA_API_KEY`, etc. Redeploy after changing them.
+- **Local:** `.env` in the repo root (see `.env.example`).
+
+The job and API read them via `process.env.*`; they are not stored in the database.
+
 ## Env
 
 - `DATABASE_URL` – Postgres connection string (required for API)

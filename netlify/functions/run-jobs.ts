@@ -5,6 +5,7 @@ import {
   RulesEngine,
   NotificationService,
   FredAdapter,
+  CoinGeckoAdapter,
   BinanceAdapter,
   AlternativeMeAdapter,
   TwelveDataAdapter,
@@ -47,6 +48,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   const registry = new RegistryService();
   const adapters: ProviderAdapter[] = [
     new FredAdapter(),
+    new CoinGeckoAdapter(),
     new BinanceAdapter(),
     new AlternativeMeAdapter(),
     new TwelveDataAdapter(),

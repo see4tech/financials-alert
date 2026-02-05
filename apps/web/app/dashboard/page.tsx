@@ -220,7 +220,7 @@ export default function DashboardPage() {
             header <code className="rounded bg-amber-100 px-1 text-xs">X-Cron-Secret: your-secret</code> (if you set <code className="rounded bg-amber-100 px-1 text-xs">CRON_SECRET</code>).
           </p>
           <p className="mt-2 text-xs text-amber-700">
-            Ensure <code className="rounded bg-amber-100 px-1">FRED_API_KEY</code> (and optionally <code className="rounded bg-amber-100 px-1">TWELVE_DATA_API_KEY</code>) are set in Netlify so the job can fetch data.
+            There is no in-app place to store API keys. Set them in <strong>Netlify → Site configuration → Environment variables</strong>: <code className="rounded bg-amber-100 px-1">FRED_API_KEY</code> (required for 10Y yield), <code className="rounded bg-amber-100 px-1">TWELVE_DATA_API_KEY</code> (optional, for DXY/Nasdaq). BTC and Fear &amp; Greed work without keys.
           </p>
         </div>
       )}

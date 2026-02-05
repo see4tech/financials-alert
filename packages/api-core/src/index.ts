@@ -18,6 +18,7 @@ export { NotificationService } from './notification.service';
 export { ProviderFactory } from './providers/provider.factory';
 export type { ProviderAdapter, NormalizedPoint, FetchParams } from './providers/adapter.interface';
 export { FredAdapter } from './providers/fred.adapter';
+export { CoinGeckoAdapter } from './providers/coingecko.adapter';
 export { BinanceAdapter } from './providers/binance.adapter';
 export { AlternativeMeAdapter } from './providers/alternative-me.adapter';
 export { TwelveDataAdapter } from './providers/twelve-data.adapter';
