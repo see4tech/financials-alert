@@ -8,6 +8,14 @@ import {
   AlertsService,
 } from '@market-health/api-core';
 
+function errorMessage(e: unknown): string {
+  if (e instanceof Error) return e.message;
+  if (typeof e === 'string') return e;
+  if (e && typeof e === 'object' && 'message' in e && typeof (e as { message: unknown }).message === 'string')
+    return (e as { message: string }).message;
+  return String(e);
+}
+
 let app: express.Express | null = null;
 
 async function getApp(): Promise<express.Express> {
@@ -37,7 +45,8 @@ async function getApp(): Promise<express.Express> {
       const data = await dashboardService.getToday(timezone);
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/dashboard/today', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
@@ -49,7 +58,8 @@ async function getApp(): Promise<express.Express> {
       const data = await indicatorsService.getHistory(key, range, granularity);
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/indicators/:key/history', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
@@ -59,7 +69,8 @@ async function getApp(): Promise<express.Express> {
       const data = await indicatorsService.getScoreHistory(range);
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/score/history', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
@@ -69,7 +80,8 @@ async function getApp(): Promise<express.Express> {
       const data = await alertsService.getHistory(range);
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/alerts/history', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
@@ -78,7 +90,8 @@ async function getApp(): Promise<express.Express> {
       const data = await alertsService.listRules();
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/rules', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
@@ -88,7 +101,8 @@ async function getApp(): Promise<express.Express> {
       if (!rule) return res.status(404).json({ error: 'Not found' });
       res.json(rule);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/rules/:id GET', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
@@ -99,7 +113,8 @@ async function getApp(): Promise<express.Express> {
       const data = await alertsService.createRule(json_rule);
       res.status(201).json(data);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/rules POST', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
@@ -110,7 +125,8 @@ async function getApp(): Promise<express.Express> {
       if (!data) return res.status(404).json({ error: 'Not found' });
       res.json(data);
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/rules/:id PATCH', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
@@ -119,7 +135,8 @@ async function getApp(): Promise<express.Express> {
       const ok = await alertsService.deleteRule(req.params.id);
       res.json({ deleted: ok });
     } catch (e) {
-      res.status(500).json({ error: String(e) });
+      console.error('/api/rules/:id DELETE', e);
+      res.status(500).json({ error: errorMessage(e) });
     }
   });
 
