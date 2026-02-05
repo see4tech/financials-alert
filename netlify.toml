@@ -1,6 +1,6 @@
 [build]
   base = ""
-  command = "npm install && npm run build:web"
+  command = "npm install && npm run build:api-core && npm run build:web"
   publish = "apps/web/out"
   functions = "netlify/functions"
 

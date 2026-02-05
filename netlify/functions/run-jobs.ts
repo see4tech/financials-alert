@@ -1,25 +1,19 @@
-import { ensureDataSource } from '../../apps/api/src/database/data-source';
-import { RegistryService } from '../../apps/api/src/indicators/registry.service';
-import { StatusEngine } from '../../apps/api/src/indicators/status-engine';
-import { RulesEngine } from '../../apps/api/src/alerts/rules-engine';
-import { NotificationService } from '../../apps/api/src/alerts/notification.service';
-import { FredAdapter } from '../../apps/api/src/providers/fred.adapter';
-import { BinanceAdapter } from '../../apps/api/src/providers/binance.adapter';
-import { AlternativeMeAdapter } from '../../apps/api/src/providers/alternative-me.adapter';
-import { TwelveDataAdapter } from '../../apps/api/src/providers/twelve-data.adapter';
-import { ProviderAdapter } from '../../apps/api/src/providers/adapter.interface';
-import { linearRegressionSlope, average } from '../../apps/api/src/indicators/trend';
-import { MoreThanOrEqual, IsNull } from 'typeorm';
 import {
-  IndicatorPointRaw,
-  IndicatorPoint,
-  DerivedMetric,
-  StatusSnapshot,
-  WeeklyScore,
-  AlertRule,
-  AlertFired,
-  NotificationDelivery,
-} from '../../apps/api/src/database/entities';
+  getDb,
+  RegistryService,
+  StatusEngine,
+  RulesEngine,
+  NotificationService,
+  FredAdapter,
+  BinanceAdapter,
+  AlternativeMeAdapter,
+  TwelveDataAdapter,
+  type ProviderAdapter,
+  linearRegressionSlope,
+  average,
+  MoreThanOrEqual,
+  IsNull,
+} from '@market-health/api-core';
 import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 
 const CRON_SECRET = process.env.CRON_SECRET || process.env.NETLIFY_CRON_SECRET;
@@ -40,15 +34,15 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   }
   // Scheduled invocations have no httpMethod; allow through
 
-  const ds = await ensureDataSource();
-  const rawRepo = ds.getRepository(IndicatorPointRaw);
-  const pointsRepo = ds.getRepository(IndicatorPoint);
-  const derivedRepo = ds.getRepository(DerivedMetric);
-  const snapshotRepo = ds.getRepository(StatusSnapshot);
-  const scoreRepo = ds.getRepository(WeeklyScore);
-  const ruleRepo = ds.getRepository(AlertRule);
-  const firedRepo = ds.getRepository(AlertFired);
-  const deliveryRepo = ds.getRepository(NotificationDelivery);
+  const db = await getDb();
+  const rawRepo = db.getRawRepo();
+  const pointsRepo = db.getPointsRepo();
+  const derivedRepo = db.getDerivedRepo();
+  const snapshotRepo = db.getSnapshotRepo();
+  const scoreRepo = db.getScoreRepo();
+  const ruleRepo = db.getRuleRepo();
+  const firedRepo = db.getFiredRepo();
+  const deliveryRepo = db.getDeliveryRepo();
 
   const registry = new RegistryService();
   const adapters: ProviderAdapter[] = [
@@ -67,23 +61,16 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     if (!adapter) continue;
     try {
       const points = await adapter.fetch(ind.key, {});
-      const keys = [...new Set(points.map((p) => p.indicatorKey))];
-      for (const p of points) {
-        await rawRepo
-          .createQueryBuilder()
-          .insert()
-          .into(IndicatorPointRaw)
-          .values({
-            id: crypto.randomUUID(),
-            ts: new Date(p.ts),
-            indicator_key: p.indicatorKey,
-            value: p.value,
-            source: p.meta.source,
-            raw_json: p.meta.raw ? JSON.parse(JSON.stringify(p.meta.raw)) : null,
-          })
-          .orIgnore()
-          .execute();
-      }
+      if (points.length === 0) continue;
+      const rows = points.map((p) => ({
+        id: crypto.randomUUID(),
+        ts: new Date(p.ts),
+        indicator_key: p.indicatorKey,
+        value: p.value,
+        source: p.meta.source,
+        raw_json: p.meta.raw ? JSON.parse(JSON.stringify(p.meta.raw)) : null,
+      }));
+      await rawRepo.insertOrIgnore(rows);
     } catch (err) {
       console.warn('Fetch failed for', ind.key, err);
     }
@@ -115,22 +102,15 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       const existing = byDay.get(day);
       if (!existing || r.ts > existing.ts) byDay.set(day, { ts: r.ts, value: Number(r.value) });
     }
-    for (const [, v] of byDay) {
-      await pointsRepo
-        .createQueryBuilder()
-        .insert()
-        .into(IndicatorPoint)
-        .values({
-          id: crypto.randomUUID(),
-          ts: v.ts,
-          indicator_key: indicatorKey,
-          value: v.value,
-          granularity: '1d',
-          quality_flag: 'ok',
-        })
-        .orIgnore()
-        .execute();
-    }
+    const pointRows = Array.from(byDay.values()).map((v) => ({
+      id: crypto.randomUUID(),
+      ts: v.ts,
+      indicator_key: indicatorKey,
+      value: v.value,
+      granularity: '1d',
+      quality_flag: 'ok',
+    }));
+    await pointsRepo.insertOrIgnore(pointRows);
   }
 
   // 3. Derived (for same keys that have config with trend_window_days)
@@ -158,11 +138,8 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       const v7d = i >= 7 ? values[i - 7].value : v0;
       const v14d = i >= 14 ? values[i - 14].value : v0;
       const v21d = i >= 21 ? values[i - 21].value : v0;
-      await derivedRepo
-        .createQueryBuilder()
-        .insert()
-        .into(DerivedMetric)
-        .values({
+      await derivedRepo.insertOrIgnore([
+        {
           id: crypto.randomUUID(),
           ts: values[i].ts,
           indicator_key: indicatorKey,
@@ -173,9 +150,8 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
           slope_14d: slope14,
           slope_21d: slope21,
           ma_21d: ma21,
-        })
-        .orIgnore()
-        .execute();
+        },
+      ]);
     }
   }
 

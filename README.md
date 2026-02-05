@@ -19,8 +19,10 @@ Dashboard, scoring, and alerts for the Weekly Market Health Checklist (macro, eq
    - Publish directory: `apps/web/out`
    - Functions directory: `netlify/functions`
 
-3. **Environment variables** (Site settings → Environment variables):
-   - `DATABASE_URL` – Supabase connection string (Project Settings → Database → URI; use pooler URI for serverless)
+3. **Environment variables** (Site settings → Environment variables). Set these in Netlify so the API and cron can connect:
+   - **`DATABASE_URL`** – **Preferred.** Supabase Postgres connection string: **Project Settings → Database → Connection string → URI** (use the **pooler** URI, port 6543, for serverless). When set, the API and cron use TypeORM over Postgres.
+   - **When Postgres is not directly accessible:** leave `DATABASE_URL` unset and set **`SUPABASE_URL`** and **`SUPABASE_SERVICE_ROLE_KEY`**. The app will use Supabase’s REST API (no direct DB connection). Ensure the same tables exist (run the migration in Supabase SQL Editor).
+   - **`SUPABASE_ANON_KEY`** – Optional; use if you add Supabase Auth/Realtime/Storage from the frontend.
    - `FRED_API_KEY` – FRED (10Y yield)
    - `TWELVE_DATA_API_KEY` – optional (DXY, Nasdaq, leaders)
    - `NEXT_PUBLIC_API_URL` – your Netlify site URL (e.g. `https://your-site.netlify.app`) so the app calls `/api` on the same origin

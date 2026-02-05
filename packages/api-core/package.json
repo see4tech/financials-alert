@@ -1,0 +1,19 @@
+{
+  "name": "@market-health/api-core",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.95.1",
+    "pg": "^8.11.3",
+    "reflect-metadata": "^0.2.1",
+    "typeorm": "^0.3.19"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

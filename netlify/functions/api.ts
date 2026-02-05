@@ -1,41 +1,32 @@
 import express, { Request, Response } from 'express';
 import serverless from 'serverless-http';
-import { ensureDataSource } from '../../apps/api/src/database/data-source';
-import { RegistryService } from '../../apps/api/src/indicators/registry.service';
-import { DashboardService } from '../../apps/api/src/dashboard/dashboard.service';
-import { IndicatorsService } from '../../apps/api/src/dashboard/indicators.service';
-import { AlertsService } from '../../apps/api/src/alerts/alerts.service';
 import {
-  StatusSnapshot,
-  IndicatorPoint,
-  WeeklyScore,
-  DerivedMetric,
-  AlertRule,
-  AlertFired,
-} from '../../apps/api/src/database/entities';
+  getDb,
+  RegistryService,
+  DashboardService,
+  IndicatorsService,
+  AlertsService,
+} from '@market-health/api-core';
 
 let app: express.Express | null = null;
 
 async function getApp(): Promise<express.Express> {
   if (app) return app;
 
-  const ds = await ensureDataSource();
+  const db = await getDb();
   const registry = new RegistryService();
   const dashboardService = new DashboardService(
-    ds.getRepository(StatusSnapshot),
-    ds.getRepository(IndicatorPoint),
-    ds.getRepository(WeeklyScore),
+    db.getSnapshotRepo(),
+    db.getPointsRepo(),
+    db.getScoreRepo(),
     registry,
   );
   const indicatorsService = new IndicatorsService(
-    ds.getRepository(IndicatorPoint),
-    ds.getRepository(DerivedMetric),
-    ds.getRepository(WeeklyScore),
+    db.getPointsRepo(),
+    db.getDerivedRepo(),
+    db.getScoreRepo(),
   );
-  const alertsService = new AlertsService(
-    ds.getRepository(AlertRule),
-    ds.getRepository(AlertFired),
-  );
+  const alertsService = new AlertsService(db.getRuleRepo(), db.getFiredRepo());
 
   app = express();
   app.use(express.json());
