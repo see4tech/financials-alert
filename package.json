@@ -1,0 +1,17 @@
+{
+  "name": "market-health",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:api": "npm run dev -w @market-health/api",
+    "dev:web": "npm run dev -w @market-health/web",
+    "build:api": "npm run build -w @market-health/api",
+    "build:web": "npm run build -w @market-health/web",
+    "build": "npm run build:api && npm run build:web",
+    "docker:up": "docker compose up -d postgres redis",
+    "docker:down": "docker compose down"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
