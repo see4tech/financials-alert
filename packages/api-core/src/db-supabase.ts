@@ -14,7 +14,8 @@ function applyWhere(sb: any, where?: Where): any {
   if (!where) return sb;
   let q = sb;
   for (const [key, value] of Object.entries(where)) {
-    if (value === undefined || value === 'undefined') continue;
+    if (value === undefined) continue;
+    if (String(value) === 'undefined') continue;
     // TypeORM FindOperator: MoreThanOrEqual etc. have .value at runtime
     if (value !== null && typeof value === 'object' && 'value' in value) {
       const v = (value as { value: unknown }).value;
@@ -28,7 +29,9 @@ function applyWhere(sb: any, where?: Where): any {
       q = q.is(key, null);
       continue;
     }
-    q = q.eq(key, value as string | number | boolean);
+    const v = value as string | number | boolean;
+    if (String(v) === 'undefined') continue;
+    q = q.eq(key, v);
   }
   return q;
 }
@@ -142,8 +145,9 @@ export function createSupabaseDb(): {
         return rowToEntity(data as Record<string, unknown>, dateKeys);
       },
       async remove(entity: Record<string, unknown>) {
-        if (!entity.id) return;
-        const { error } = await supabase.from(table).delete().eq('id', entity.id);
+        const id = entity.id;
+        if (!id || id === 'undefined') return;
+        const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) throw toError(error);
       },
       ...(insertOrIgnore
