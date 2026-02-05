@@ -91,17 +91,18 @@ export function createSupabaseDb(): {
 
   function makeRepo(
     table: string,
-    opts: { insertOrIgnore?: boolean; conflictColumns?: string; dateKeys?: string[] } = {},
+    opts: { insertOrIgnore?: boolean; conflictColumns?: string; dateKeys?: string[]; defaultOrderKey?: string } = {},
   ) {
     const dateKeys = opts.dateKeys ?? ['ts'];
     const insertOrIgnore = opts.insertOrIgnore ?? false;
     const conflictColumns = opts.conflictColumns ?? 'id';
+    const defaultOrderKey = opts.defaultOrderKey ?? 'ts';
 
     return {
       async find(opts?: { where?: Where; order?: { ts?: 'ASC' | 'DESC'; week_start_date?: 'ASC' | 'DESC'; id?: 'ASC' | 'DESC' }; take?: number }) {
         let q = applyWhere(supabase.from(table).select('*'), opts?.where);
         const orderEntry = opts?.order ? Object.entries(opts.order)[0] : undefined;
-        const orderKey = orderEntry?.[0] ?? 'ts';
+        const orderKey = orderEntry?.[0] ?? defaultOrderKey;
         const asc = (orderEntry?.[1] ?? 'ASC') === 'ASC';
         q = q.order(orderKey, { ascending: asc });
         if (opts?.take) q = q.limit(opts.take);
@@ -112,7 +113,7 @@ export function createSupabaseDb(): {
       async findOne(opts?: { where?: Where; order?: { ts?: 'ASC' | 'DESC'; week_start_date?: 'ASC' | 'DESC'; id?: 'ASC' | 'DESC' } }) {
         let q = applyWhere(supabase.from(table).select('*'), opts?.where);
         const orderEntry = opts?.order ? Object.entries(opts.order)[0] : undefined;
-        const orderKey = orderEntry?.[0] ?? 'ts';
+        const orderKey = orderEntry?.[0] ?? defaultOrderKey;
         const asc = (orderEntry?.[1] ?? 'DESC') === 'ASC';
         q = q.order(orderKey, { ascending: asc }).limit(1);
         const { data, error } = (await q) as { data: Record<string, unknown>[] | null; error: Error | null };
@@ -159,8 +160,8 @@ export function createSupabaseDb(): {
     getDerivedRepo: () =>
       makeRepo('derived_metrics', { insertOrIgnore: true, conflictColumns: 'indicator_key,ts', dateKeys: ['ts'] }) as ReturnType<typeof makeRepo> & { insertOrIgnore: (rows: Record<string, unknown>[]) => Promise<void> },
     getSnapshotRepo: () => makeRepo('status_snapshots', { dateKeys: ['ts'] }),
-    getScoreRepo: () => makeRepo('weekly_scores', { dateKeys: [] }),
-    getRuleRepo: () => makeRepo('alert_rules'),
+    getScoreRepo: () => makeRepo('weekly_scores', { dateKeys: [], defaultOrderKey: 'week_start_date' }),
+    getRuleRepo: () => makeRepo('alert_rules', { defaultOrderKey: 'id' }),
     getFiredRepo: () => makeRepo('alerts_fired', { dateKeys: ['ts'] }),
     getDeliveryRepo: () => makeRepo('notification_deliveries', { dateKeys: ['ts'] }),
   };

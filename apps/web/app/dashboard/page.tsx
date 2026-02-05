@@ -48,6 +48,7 @@ export default function DashboardPage() {
         const [d, sh] = await refreshData();
         setData(d);
         setScoreHistory(sh.data || []);
+        setError(null);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         if (msg.includes('Cron secret required')) setCronSecretPrompt(true);
@@ -60,7 +61,51 @@ export default function DashboardPage() {
   );
 
   if (loading) return <div className="p-8">Loading...</div>;
-  if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
+  if (error) {
+    return (
+      <main className="min-h-screen p-8 max-w-6xl mx-auto">
+        <nav className="mb-8 flex gap-4">
+          <Link href="/" className="text-blue-600 hover:underline">Home</Link>
+          <Link href="/indicators" className="text-blue-600 hover:underline">Indicators</Link>
+          <Link href="/alerts" className="text-blue-600 hover:underline">Alerts</Link>
+        </nav>
+        <div className="mb-4 text-red-600">Error: {error}</div>
+        <p className="mb-4 text-sm text-gray-600">You can try running the data job to populate the database, then refresh.</p>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => runJobsNow()}
+            disabled={runJobsLoading}
+            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+          >
+            {runJobsLoading ? 'Running…' : 'Run jobs now'}
+          </button>
+          {runJobsError && <p className="text-sm text-red-600">{runJobsError}</p>}
+        </div>
+        {cronSecretPrompt && (
+          <div className="mt-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-800">
+            <label htmlFor="cron-secret-err" className="text-sm font-medium">Cron secret (CRON_SECRET in Netlify):</label>
+            <input
+              id="cron-secret-err"
+              type="password"
+              value={cronSecretInput}
+              onChange={(e) => setCronSecretInput(e.target.value)}
+              placeholder="Enter secret"
+              className="rounded border border-amber-300 px-2 py-1 text-sm"
+            />
+            <button
+              type="button"
+              onClick={() => runJobsNow(cronSecretInput)}
+              disabled={runJobsLoading || !cronSecretInput.trim()}
+              className="rounded bg-amber-600 px-3 py-1 text-sm text-white hover:bg-amber-700 disabled:opacity-50"
+            >
+              Run with secret
+            </button>
+          </div>
+        )}
+      </main>
+    );
+  }
   if (!data) return null;
 
   const statusColor = (s: string) =>
