@@ -1,0 +1,16 @@
+[build]
+  base = ""
+  command = "npm install && npm run build:web"
+  publish = "apps/web/out"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Next.js: use framework detection or set NEXT_PUBLIC_API_URL in Netlify UI to your site URL (same-origin /api)
+# API and run-jobs run as Netlify Functions; /api/* is rewritten to the api function
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true

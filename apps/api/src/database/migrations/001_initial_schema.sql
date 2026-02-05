@@ -1,8 +1,5 @@
--- Market Health Checklist: initial schema + TimescaleDB
--- Run with: psql $DATABASE_URL -f 001_initial_schema.sql
-
--- Enable TimescaleDB
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+-- Market Health Checklist: initial schema (Supabase / plain Postgres)
+-- Run in Supabase SQL Editor or: psql $DATABASE_URL -f 001_initial_schema.sql
 
 -- users
 CREATE TABLE IF NOT EXISTS users (
@@ -22,7 +19,7 @@ CREATE TABLE IF NOT EXISTS indicators (
   enabled BOOLEAN NOT NULL DEFAULT true
 );
 
--- indicator_points_raw (hypertable; PK must include ts)
+-- indicator_points_raw (PK includes ts for compatibility)
 CREATE TABLE IF NOT EXISTS indicator_points_raw (
   id UUID DEFAULT gen_random_uuid(),
   indicator_key TEXT NOT NULL,
@@ -34,9 +31,8 @@ CREATE TABLE IF NOT EXISTS indicator_points_raw (
 );
 CREATE INDEX IF NOT EXISTS idx_indicator_points_raw_key_ts ON indicator_points_raw (indicator_key, ts DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_indicator_points_raw_key_ts ON indicator_points_raw (indicator_key, ts);
-SELECT create_hypertable('indicator_points_raw', 'ts', chunk_time_interval => INTERVAL '7 days', if_not_exists => true);
 
--- indicator_points (hypertable)
+-- indicator_points
 CREATE TABLE IF NOT EXISTS indicator_points (
   id UUID DEFAULT gen_random_uuid(),
   indicator_key TEXT NOT NULL,
@@ -48,9 +44,8 @@ CREATE TABLE IF NOT EXISTS indicator_points (
 );
 CREATE INDEX IF NOT EXISTS idx_indicator_points_key_ts ON indicator_points (indicator_key, ts DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_indicator_points_key_ts ON indicator_points (indicator_key, ts);
-SELECT create_hypertable('indicator_points', 'ts', chunk_time_interval => INTERVAL '7 days', if_not_exists => true);
 
--- derived_metrics (hypertable)
+-- derived_metrics
 CREATE TABLE IF NOT EXISTS derived_metrics (
   id UUID DEFAULT gen_random_uuid(),
   indicator_key TEXT NOT NULL,
@@ -66,9 +61,8 @@ CREATE TABLE IF NOT EXISTS derived_metrics (
 );
 CREATE INDEX IF NOT EXISTS idx_derived_metrics_key_ts ON derived_metrics (indicator_key, ts DESC);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_derived_metrics_key_ts ON derived_metrics (indicator_key, ts);
-SELECT create_hypertable('derived_metrics', 'ts', chunk_time_interval => INTERVAL '30 days', if_not_exists => true);
 
--- status_snapshots (regular table; optional hypertable later)
+-- status_snapshots
 CREATE TABLE IF NOT EXISTS status_snapshots (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   ts TIMESTAMPTZ NOT NULL,

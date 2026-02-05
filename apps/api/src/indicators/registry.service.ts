@@ -29,10 +29,23 @@ export class RegistryService {
   }
 
   private load(): void {
-    const p = path.join(__dirname, 'registry.json');
-    const raw = fs.readFileSync(p, 'utf-8');
-    const data: RegistryFile = JSON.parse(raw);
-    this.config = data.indicators;
+    const candidates = [
+      path.join(__dirname, 'registry.json'),
+      process.env.REGISTRY_PATH || '',
+      path.join(process.cwd(), 'apps', 'api', 'src', 'indicators', 'registry.json'),
+      path.join(process.cwd(), 'netlify', 'functions', 'registry.json'),
+    ].filter(Boolean);
+    for (const p of candidates) {
+      try {
+        const raw = fs.readFileSync(p, 'utf-8');
+        const data: RegistryFile = JSON.parse(raw);
+        this.config = data.indicators;
+        return;
+      } catch {
+        continue;
+      }
+    }
+    throw new Error('Could not load registry.json from any candidate path');
   }
 
   getAll(): IndicatorConfig[] {

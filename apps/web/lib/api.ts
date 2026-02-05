@@ -1,4 +1,5 @@
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+// On Netlify leave unset to use same-origin /api (rewritten to serverless function). Local dev: set to http://localhost:3000.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? (typeof window !== 'undefined' ? '' : 'http://localhost:3000');
 
 export async function fetchDashboard(timezone?: string) {
   const q = timezone ? `?timezone=${encodeURIComponent(timezone)}` : '';
