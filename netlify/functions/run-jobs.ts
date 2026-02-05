@@ -35,6 +35,12 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   }
   // Scheduled invocations have no httpMethod; allow through
 
+  // Log env presence (no values) to confirm keys reach the function
+  console.log('run-jobs: env check', {
+    FRED_API_KEY: !!process.env.FRED_API_KEY,
+    TWELVE_DATA_API_KEY: !!process.env.TWELVE_DATA_API_KEY,
+  });
+
   const db = await getDb();
   const rawRepo = db.getRawRepo();
   const pointsRepo = db.getPointsRepo();
@@ -60,10 +66,16 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   // 1. Fetch
   for (const ind of registry.getEnabled()) {
     const adapter = getAdapter(ind.key);
-    if (!adapter) continue;
+    if (!adapter) {
+      console.warn('No adapter for', ind.key);
+      continue;
+    }
     try {
       const points = await adapter.fetch(ind.key, {});
-      if (points.length === 0) continue;
+      if (points.length === 0) {
+        console.warn('Fetch returned 0 points for', ind.key, '(adapter:', adapter.name + ')');
+        continue;
+      }
       const rows = points.map((p) => ({
         id: crypto.randomUUID(),
         ts: new Date(p.ts),
@@ -73,6 +85,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
         raw_json: p.meta.raw ? JSON.parse(JSON.stringify(p.meta.raw)) : null,
       }));
       await rawRepo.insertOrIgnore(rows);
+      console.log('Fetched and inserted', rows.length, 'raw rows for', ind.key);
     } catch (err) {
       console.warn('Fetch failed for', ind.key, err);
     }
@@ -97,7 +110,10 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       order: { ts: 'ASC' },
       take: 5000,
     });
-    if (raws.length === 0) continue;
+    if (raws.length === 0) {
+      console.warn('Aggregate: no raw data for', indicatorKey, '(skip)');
+      continue;
+    }
     const byDay = new Map<string, { ts: Date; value: number }>();
     for (const r of raws) {
       const day = r.ts.toISOString().slice(0, 10);
@@ -113,6 +129,7 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
       quality_flag: 'ok',
     }));
     await pointsRepo.insertOrIgnore(pointRows);
+    console.log('Aggregated', indicatorKey, ':', raws.length, 'raw ->', pointRows.length, 'points');
   }
 
   // 3. Derived (for same keys that have config with trend_window_days)
