@@ -9,11 +9,25 @@ function toError(e: unknown): Error {
   return new Error(String(e));
 }
 
+/** Strip undefined and "undefined" from where so they never reach Postgres (invalid UUID). */
+function sanitizeWhere(where?: Where): Where | undefined {
+  if (!where || typeof where !== 'object') return where;
+  const out: Where = {};
+  for (const [k, v] of Object.entries(where)) {
+    if (v === undefined) continue;
+    if (typeof v === 'string' && v === 'undefined') continue;
+    if (String(v) === 'undefined') continue;
+    out[k] = v;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyWhere(sb: any, where?: Where): any {
-  if (!where) return sb;
+  const safe = sanitizeWhere(where);
+  if (!safe) return sb;
   let q = sb;
-  for (const [key, value] of Object.entries(where)) {
+  for (const [key, value] of Object.entries(safe)) {
     if (value === undefined) continue;
     if (String(value) === 'undefined') continue;
     // TypeORM FindOperator: MoreThanOrEqual etc. have .value at runtime
