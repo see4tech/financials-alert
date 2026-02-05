@@ -28,13 +28,16 @@ export class RulesEngine {
   ) {}
 
   async evaluateRule(rule: AlertRule): Promise<{ fired: boolean; payload?: Record<string, unknown> }> {
+    const ruleId = rule?.id;
+    if (!ruleId || String(ruleId) === 'undefined') return { fired: false };
+
     const json = rule.json_rule as unknown as AlertRuleJson;
     const condition = json.condition;
     if (!condition) return { fired: false };
 
     const cooldownMs = (json.cooldownMinutes ?? 360) * 60 * 1000;
     const lastFired = await this.firedRepo.findOne({
-      where: { rule_id: rule.id },
+      where: { rule_id: ruleId },
       order: { ts: 'DESC' },
     });
     if (lastFired && lastFired.ts.getTime() > Date.now() - cooldownMs) {

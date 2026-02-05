@@ -277,22 +277,24 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   const rules = await ruleRepo.find({ where: { is_enabled: true } });
 
   for (const rule of rules) {
+    const ruleId = rule?.id;
+    if (!ruleId || String(ruleId) === 'undefined') continue;
     try {
       const { fired, payload } = await rulesEngine.evaluateRule(rule);
       if (!fired || !payload) continue;
       const json = rule.json_rule as { name?: string; cooldownMinutes?: number; condition?: unknown; actions?: string[] };
-      const dedupeKey = rulesEngine.dedupeKey(rule.id, payload);
+      const dedupeKey = rulesEngine.dedupeKey(ruleId, payload);
       const existingFired = await firedRepo.findOne({ where: { dedupe_key: dedupeKey } });
       if (existingFired) continue;
       const alert = await firedRepo.save({
-        rule_id: rule.id,
+        rule_id: ruleId,
         ts: new Date(),
         payload,
         dedupe_key: dedupeKey,
       });
       await notificationService.send(alert.id, payload, json.actions ?? ['email']);
     } catch (err) {
-      console.warn('Rule eval failed', rule.id, err);
+      console.warn('Rule eval failed', ruleId, err);
     }
   }
 
