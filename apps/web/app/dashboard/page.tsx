@@ -92,7 +92,17 @@ export default function DashboardPage() {
         ))}
       </div>
       {data.indicators.length === 0 && (
-        <p className="text-gray-500">No indicator data yet. Run the API and worker to populate data.</p>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+          <p className="font-medium">No indicator data yet</p>
+          <p className="mt-1 text-sm">
+            Data is filled by a background job that runs every 15 minutes. If you just deployed, wait for the next run
+            or trigger it manually: <code className="rounded bg-amber-100 px-1 text-xs">POST /.netlify/functions/run-jobs</code> with
+            header <code className="rounded bg-amber-100 px-1 text-xs">X-Cron-Secret: your-secret</code> (if you set <code className="rounded bg-amber-100 px-1 text-xs">CRON_SECRET</code>).
+          </p>
+          <p className="mt-2 text-xs text-amber-700">
+            Ensure <code className="rounded bg-amber-100 px-1">FRED_API_KEY</code> (and optionally <code className="rounded bg-amber-100 px-1">TWELVE_DATA_API_KEY</code>) are set in Netlify so the job can fetch data.
+          </p>
+        </div>
       )}
     </main>
   );

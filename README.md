@@ -31,6 +31,8 @@ Dashboard, scoring, and alerts for the Weekly Market Health Checklist (macro, eq
 
 4. **Jobs**: The `run-jobs` function runs on a **schedule** (every 15 minutes via Netlify Scheduled Functions). No Redis or worker process. To trigger manually: `POST https://your-site.netlify.app/.netlify/functions/run-jobs` with header `X-Cron-Secret: <CRON_SECRET>` if set.
 
+   **Indicators show no data?** Data is filled by `run-jobs`. Set **`FRED_API_KEY`** (required for 10Y yield and others) and optionally **`TWELVE_DATA_API_KEY`** in Netlify so the job can fetch data. After deploy, wait up to 15 minutes for the first scheduled run, or trigger the job manually (see above). Check Netlify → Functions → run-jobs logs for errors.
+
 5. **Redirect**: `netlify.toml` rewrites `/api/*` to `/.netlify/functions/api`. The Next.js app uses `NEXT_PUBLIC_API_URL` or same-origin `/api`.
 
 ## Quick start (local)

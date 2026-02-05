@@ -53,7 +53,13 @@ export function IndicatorDetailClient({ keyParam }: { keyParam: string }) {
         </button>
       </div>
       {points.length === 0 ? (
-        <p className="text-gray-500">No history yet.</p>
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+          <p className="font-medium">No history yet</p>
+          <p className="mt-1 text-sm">
+            Indicator data is populated by a scheduled job (every 15 min). Wait for the next run or trigger{' '}
+            <code className="rounded bg-amber-100 px-1 text-xs">/.netlify/functions/run-jobs</code> manually.
+          </p>
+        </div>
       ) : (
         <div className="border rounded-lg p-4 bg-white h-64 flex items-end gap-px">
           {points.map((p) => (
