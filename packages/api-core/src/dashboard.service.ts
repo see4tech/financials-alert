@@ -41,11 +41,17 @@ export class DashboardService {
     }
 
     const weekStart = this.weekStart(new Date());
-    const scoreRow = await this.scoreRepo.findOne({
-      where: { week_start_date: weekStart, user_id: IsNull() },
-    });
-    const score = scoreRow?.score ?? 0;
-    const deltaWeek = scoreRow?.delta_score ?? 0;
+    let score = 0;
+    let deltaWeek = 0;
+    try {
+      const scoreRow = await this.scoreRepo.findOne({
+        where: { week_start_date: weekStart, user_id: IsNull() },
+      });
+      score = scoreRow?.score ?? 0;
+      deltaWeek = scoreRow?.delta_score ?? 0;
+    } catch {
+      // avoid 500 if weekly_scores query fails (e.g. bad UUID)
+    }
 
     const bull = this.scenarioBull(indicators);
     const bear = this.scenarioBear(indicators);

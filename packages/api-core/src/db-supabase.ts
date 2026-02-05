@@ -9,6 +9,11 @@ function toError(e: unknown): Error {
   return new Error(String(e));
 }
 
+function isUuidUndefinedError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : e && typeof e === 'object' && 'message' in e ? String((e as { message: unknown }).message) : String(e);
+  return /invalid input syntax for type uuid.*undefined/i.test(msg);
+}
+
 /** Strip undefined and "undefined" from where so they never reach Postgres (invalid UUID). */
 function sanitizeWhere(where?: Where): Where | undefined {
   if (!where || typeof where !== 'object') return where;
@@ -37,13 +42,20 @@ function applyWhere(sb: any, where?: Where): any {
       else q = q.gte(key, v);
       continue;
     }
-    // TypeORM IsNull() - FindOperator with _type
-    const op = value as { _type?: string };
-    if (op && typeof op === 'object' && (op._type === 'isNull' || (op as { type?: string }).type === 'isNull')) {
+    // TypeORM IsNull() - FindOperator with _type (or any object that shouldn't be sent as a value)
+    const op = value as { _type?: string; type?: string };
+    if (op && typeof op === 'object') {
+      if (op._type === 'isNull' || op.type === 'isNull') {
+        q = q.is(key, null);
+        continue;
+      }
+      continue; // don't pass unknown objects to .eq() - they can serialize to "undefined"
+    }
+    const v = value as string | number | boolean | null;
+    if (v === null) {
       q = q.is(key, null);
       continue;
     }
-    const v = value as string | number | boolean;
     if (String(v) === 'undefined') continue;
     q = q.eq(key, v);
   }
@@ -125,26 +137,36 @@ export function createSupabaseDb(): {
 
     return {
       async find(opts?: { where?: Where; order?: { ts?: 'ASC' | 'DESC'; week_start_date?: 'ASC' | 'DESC'; id?: 'ASC' | 'DESC' }; take?: number }) {
-        let q = applyWhere(supabase.from(table).select('*'), opts?.where);
-        const orderEntry = opts?.order ? Object.entries(opts.order)[0] : undefined;
-        const orderKey = orderEntry?.[0] ?? defaultOrderKey;
-        const asc = (orderEntry?.[1] ?? 'ASC') === 'ASC';
-        q = q.order(orderKey, { ascending: asc });
-        if (opts?.take) q = q.limit(opts.take);
-        const { data, error } = (await q) as { data: Record<string, unknown>[] | null; error: Error | null };
-        if (error) throw toError(error);
-        return (data ?? []).map((r: Record<string, unknown>) => rowToEntity(r, dateKeys));
+        try {
+          let q = applyWhere(supabase.from(table).select('*'), opts?.where);
+          const orderEntry = opts?.order ? Object.entries(opts.order)[0] : undefined;
+          const orderKey = orderEntry?.[0] ?? defaultOrderKey;
+          const asc = (orderEntry?.[1] ?? 'ASC') === 'ASC';
+          q = q.order(orderKey, { ascending: asc });
+          if (opts?.take) q = q.limit(opts.take);
+          const { data, error } = (await q) as { data: Record<string, unknown>[] | null; error: Error | null };
+          if (error) throw toError(error);
+          return (data ?? []).map((r: Record<string, unknown>) => rowToEntity(r, dateKeys));
+        } catch (err) {
+          if (isUuidUndefinedError(err)) return [];
+          throw err;
+        }
       },
       async findOne(opts?: { where?: Where; order?: { ts?: 'ASC' | 'DESC'; week_start_date?: 'ASC' | 'DESC'; id?: 'ASC' | 'DESC' } }) {
-        let q = applyWhere(supabase.from(table).select('*'), opts?.where);
-        const orderEntry = opts?.order ? Object.entries(opts.order)[0] : undefined;
-        const orderKey = orderEntry?.[0] ?? defaultOrderKey;
-        const asc = (orderEntry?.[1] ?? 'DESC') === 'ASC';
-        q = q.order(orderKey, { ascending: asc }).limit(1);
-        const { data, error } = (await q) as { data: Record<string, unknown>[] | null; error: Error | null };
-        if (error) throw toError(error);
-        const row = (data ?? [])[0];
-        return row ? rowToEntity(row as Record<string, unknown>, dateKeys) : null;
+        try {
+          let q = applyWhere(supabase.from(table).select('*'), opts?.where);
+          const orderEntry = opts?.order ? Object.entries(opts.order)[0] : undefined;
+          const orderKey = orderEntry?.[0] ?? defaultOrderKey;
+          const asc = (orderEntry?.[1] ?? 'DESC') === 'ASC';
+          q = q.order(orderKey, { ascending: asc }).limit(1);
+          const { data, error } = (await q) as { data: Record<string, unknown>[] | null; error: Error | null };
+          if (error) throw toError(error);
+          const row = (data ?? [])[0];
+          return row ? rowToEntity(row as Record<string, unknown>, dateKeys) : null;
+        } catch (err) {
+          if (isUuidUndefinedError(err)) return null;
+          throw err;
+        }
       },
       async save(entity: Record<string, unknown>) {
         const row = entityToRow(entity, dateKeys);
