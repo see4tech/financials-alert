@@ -21,6 +21,8 @@ export const en = {
     weeklyScoreTooltip: 'Number of indicators in GREEN status this week (max 6). Counted every Monday.',
     deltaWeek: 'Δ week',
     scoreHistory: 'Score history (12w)',
+    scoreHistoryRange: 'Range: last 12 weeks.',
+    scoreHistoryEmpty: 'No data yet. It will fill when the job has saved scores (use Refresh).',
     scoreHistoryTooltip: 'Weekly score for the last 12 weeks. Each bar = one week (Monday–Sunday). Hover a bar to see date and score.',
     scoreHistoryCaption: '0–8 = number of indicators in green. Each bar = 1 week.',
     scoreHistoryWhatItIs: 'Each bar is that week’s score: how many indicators were GREEN (0–8). It is the value from the last run that week (one moment, not a 7-day average). Not compared to another series.',

@@ -189,6 +189,7 @@ export default function DashboardPage() {
           onMouseLeave={() => { setHoveredSummaryCard(null); setHoveredScoreBar(null); }}
         >
           <h2 className="text-sm font-medium text-gray-500">{t('dashboard.scoreHistory')}</h2>
+          <p className="text-xs text-gray-400 mt-0.5">{t('dashboard.scoreHistoryRange')}</p>
           {hoveredSummaryCard === 'scoreHistory' && (
             <div className="absolute z-20 left-0 right-0 bottom-full mb-1 p-3 text-xs text-left bg-gray-800 text-white rounded-lg shadow-lg pointer-events-none max-w-sm">
               <p className="mb-1">{t('dashboard.scoreHistoryCaption')}</p>
@@ -197,7 +198,7 @@ export default function DashboardPage() {
             </div>
           )}
           {scoreHistory.length === 0 ? (
-            <p className="text-xs text-gray-500 mt-2">—</p>
+            <p className="text-xs text-gray-500 mt-2">{t('dashboard.scoreHistoryEmpty')}</p>
           ) : (
             <div className="flex gap-1 h-28 mt-2 items-end">
               <div className="flex flex-col justify-between text-right text-xs text-gray-500 pr-1 shrink-0 h-full">
