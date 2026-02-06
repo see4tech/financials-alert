@@ -30,6 +30,8 @@ export default function DashboardPage() {
   const [cronSecretPrompt, setCronSecretPrompt] = useState(false);
   const [cronSecretInput, setCronSecretInput] = useState('');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
+  const [hoveredSummaryCard, setHoveredSummaryCard] = useState<'weeklyScore' | 'scoreHistory' | null>(null);
+  const [hoveredScoreBar, setHoveredScoreBar] = useState<{ week_start_date: string; score: number } | null>(null);
 
   useEffect(() => {
     refreshData()
@@ -165,23 +167,73 @@ export default function DashboardPage() {
       )}
 
       <section className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
+        <div
+          className="border rounded-lg p-4 bg-white shadow-sm relative"
+          onMouseEnter={() => setHoveredSummaryCard('weeklyScore')}
+          onMouseLeave={() => setHoveredSummaryCard(null)}
+        >
           <h2 className="text-sm font-medium text-gray-500">{t('dashboard.weeklyScore')}</h2>
           <p className="text-3xl font-bold">{data.score}</p>
           <p className="text-sm text-gray-600">{t('dashboard.deltaWeek')}: {data.deltaWeek >= 0 ? '+' : ''}{data.deltaWeek}</p>
+          {hoveredSummaryCard === 'weeklyScore' && (
+            <div className="absolute z-20 left-0 right-0 bottom-full mb-1 p-3 text-xs text-left bg-gray-800 text-white rounded-lg shadow-lg pointer-events-none">
+              {t('dashboard.weeklyScoreTooltip')}
+            </div>
+          )}
         </div>
-        <div className="border rounded-lg p-4 bg-white shadow-sm">
+        <div
+          className="border rounded-lg p-4 bg-white shadow-sm relative"
+          onMouseEnter={() => setHoveredSummaryCard('scoreHistory')}
+          onMouseLeave={() => { setHoveredSummaryCard(null); setHoveredScoreBar(null); }}
+        >
           <h2 className="text-sm font-medium text-gray-500">{t('dashboard.scoreHistory')}</h2>
-          <div className="flex items-end gap-0.5 h-12 mt-2">
-            {scoreHistory.slice(-12).map((s) => (
-              <div
-                key={s.week_start_date}
-                className="flex-1 bg-blue-200 rounded-t min-w-[4px]"
-                style={{ height: `${Math.max(8, (Number(s.score) / 8) * 100)}%` }}
-                title={`${s.week_start_date}: ${s.score}`}
-              />
-            ))}
-          </div>
+          {hoveredSummaryCard === 'scoreHistory' && (
+            <div className="absolute z-20 left-0 right-0 bottom-full mb-1 p-3 text-xs text-left bg-gray-800 text-white rounded-lg shadow-lg pointer-events-none">
+              {t('dashboard.scoreHistoryTooltip')}
+            </div>
+          )}
+          {scoreHistory.length === 0 ? (
+            <p className="text-xs text-gray-500 mt-2">—</p>
+          ) : (
+            <div className="flex gap-1 h-24 mt-2 items-end">
+              <div className="flex flex-col justify-between text-right text-xs text-gray-500 pr-1 shrink-0 h-full">
+                <span>8</span>
+                <span>4</span>
+                <span>0</span>
+              </div>
+              <div className="flex-1 flex gap-0.5 min-w-0 h-full">
+                {scoreHistory.slice(-12).map((s) => {
+                  const scoreNum = Number(s.score);
+                  const maxScore = 8;
+                  const pct = Math.min(100, (scoreNum / maxScore) * 100);
+                  return (
+                    <div
+                      key={s.week_start_date}
+                      className="flex-1 flex flex-col justify-end items-center min-w-0 h-full cursor-default"
+                      onMouseEnter={() => setHoveredScoreBar(s)}
+                      onMouseLeave={() => setHoveredScoreBar(null)}
+                      title={`${s.week_start_date}: ${s.score}`}
+                    >
+                      <div
+                        className="w-full bg-blue-400 rounded-t min-h-[2px]"
+                        style={{ height: `${Math.max(2, pct)}%` }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+          {scoreHistory.length > 0 && (
+            <>
+              <p className="text-xs text-gray-500 mt-1">{t('dashboard.scoreHistoryCaption')}</p>
+              {hoveredScoreBar && (
+                <p className="text-xs font-medium text-gray-700 mt-1">
+                  {hoveredScoreBar.week_start_date}: {hoveredScoreBar.score}
+                </p>
+              )}
+            </>
+          )}
         </div>
         <div className="border rounded-lg p-4 bg-white shadow-sm">
           <h2 className="text-sm font-medium text-gray-500">{t('dashboard.scenario')}</h2>
