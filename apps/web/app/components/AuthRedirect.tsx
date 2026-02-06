@@ -5,7 +5,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { useSupabaseAuthReady } from '@/app/context/SupabaseAuthContext';
 
-const PROTECTED_PREFIXES = ['/dashboard', '/indicators', '/alerts'];
+const PROTECTED_PREFIXES = ['/dashboard', '/indicators', '/alerts', '/settings'];
 const PUBLIC_PATHS = ['/login', '/signup'];
 
 function isProtectedPath(pathname: string): boolean {

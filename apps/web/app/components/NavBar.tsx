@@ -51,6 +51,9 @@ export function NavBar() {
           <Link href="/alerts" className="text-blue-600 hover:underline">
             {t('nav.alerts')}
           </Link>
+          <Link href="/settings" className="text-blue-600 hover:underline">
+            {t('nav.settings')}
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

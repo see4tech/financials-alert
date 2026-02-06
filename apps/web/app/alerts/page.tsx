@@ -29,14 +29,17 @@ const CONDITION_TYPES = [
 
 type Rule = { id: string; json_rule: Record<string, unknown>; is_enabled: boolean };
 
-function buildJsonRule(form: {
+type AlertForm = {
   name: string;
   conditionType: string;
   indicatorKey: string;
   threshold: string;
   confirmations: string;
+  is_enabled: boolean;
   sendEmail: boolean;
-}): Record<string, unknown> {
+};
+
+function buildJsonRule(form: AlertForm): Record<string, unknown> {
   const condition: Record<string, unknown> = {
     type: form.conditionType,
     indicatorKey: form.indicatorKey || undefined,
@@ -58,15 +61,7 @@ function buildJsonRule(form: {
   };
 }
 
-function ruleToForm(rule: Rule): {
-  name: string;
-  conditionType: string;
-  indicatorKey: string;
-  threshold: string;
-  confirmations: string;
-  is_enabled: boolean;
-  sendEmail: boolean;
-} {
+function ruleToForm(rule: Rule): AlertForm {
   const j = rule.json_rule || {};
   const cond = (j.condition as Record<string, unknown>) || {};
   const actions = (j.actions as string[] | undefined) || [];
@@ -81,7 +76,7 @@ function ruleToForm(rule: Rule): {
   };
 }
 
-const emptyForm = {
+const emptyForm: AlertForm = {
   name: '',
   conditionType: 'cross_below',
   indicatorKey: INDICATOR_KEYS[0],

@@ -90,6 +90,27 @@ export async function triggerRunJobs(cronSecret?: string): Promise<{ ok: boolean
   return res.json().catch(() => ({ ok: true }));
 }
 
+export async function getLlmSettings(accessToken: string): Promise<{ provider: string | null; hasKey: boolean }> {
+  const res = await fetch(`${API_BASE}/api/user/llm-settings`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+export async function saveLlmSettings(
+  accessToken: string,
+  payload: { provider: string; api_key: string },
+): Promise<{ provider: string; saved: boolean }> {
+  const res = await fetch(`${API_BASE}/api/user/llm-settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(payload),
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
 /** One-time backfill: load 90 days of history for all indicators. Uses same secret as run-jobs (CRON_SECRET). */
 export async function triggerBackfillHistory(cronSecret?: string): Promise<{ ok: boolean; message?: string; results?: Record<string, { raw: number; points: number }> }> {
   const base = typeof window !== 'undefined' ? '' : API_BASE || 'http://localhost:3000';
