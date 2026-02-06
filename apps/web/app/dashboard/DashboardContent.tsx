@@ -347,15 +347,18 @@ export function DashboardContent(props: DashboardContentProps) {
       {userAssets.length > 0 && (
         <>
           <ul className="flex flex-wrap gap-2 mb-3">
-            {userAssets.map((a) => (
-              <li key={a.id} className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-sm">
-                <span>{a.symbol}</span>
-                <span className="text-gray-500 text-xs">({t('dashboard.assetType' + (a.asset_type === 'stock' ? 'Stock' : a.asset_type === 'etf' ? 'Etf' : a.asset_type === 'commodity' ? 'Commodity' : 'Crypto')})})</span>
-                <button type="button" onClick={() => handleRemoveAsset(a.id)} className="text-red-600 hover:underline text-xs" aria-label={t('dashboard.removeAsset')}>
-                  ×
-                </button>
-              </li>
-            ))}
+            {userAssets.map((a) => {
+              const typeKey = a.asset_type === 'stock' ? 'Stock' : a.asset_type === 'etf' ? 'Etf' : a.asset_type === 'commodity' ? 'Commodity' : 'Crypto';
+              return (
+                <li key={a.id} className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-sm">
+                  <span>{a.symbol}</span>
+                  <span className="text-gray-500 text-xs">({t('dashboard.assetType' + typeKey)})</span>
+                  <button type="button" onClick={() => handleRemoveAsset(a.id)} className="text-red-600 hover:underline text-xs" aria-label={t('dashboard.removeAsset')}>
+                    ×
+                  </button>
+                </li>
+              );
+            })}
           </ul>
           <button
             type="button"
