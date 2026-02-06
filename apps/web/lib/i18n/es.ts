@@ -24,7 +24,7 @@ export const es: typeof en = {
     deltaWeek: 'Δ semana',
     scoreHistory: 'Historial (12 sem)',
     scoreHistoryRange: 'Rango: últimas 12 semanas.',
-    scoreHistoryEmpty: 'Sin datos aún. Se rellenará cuando el job haya guardado puntuaciones (usa «Actualizar»).',
+    scoreHistoryEmpty: 'Sin datos aún. Pulsa «Actualizar» para ejecutar el job; tras guardar la puntuación semanal, aquí aparecerá al menos una barra. Si ya pulsaste Actualizar y sigue vacío, haz un despliegue para que la API use la última versión.',
     scoreHistoryTooltip: 'Puntuación semanal de las últimas 12 semanas. Cada barra = una semana (lunes–domingo). Pasa el ratón para ver fecha y valor.',
     scoreHistoryCaption: '0–8 = nº indicadores en verde. Cada barra = 1 semana.',
     scoreHistoryWhatItIs: 'Cada barra es la puntuación de esa semana: cuántos indicadores estaban en VERDE (0–8). Es el valor del último cálculo de esa semana (un momento, no un promedio de 7 días). No se compara con otra serie.',

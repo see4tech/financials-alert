@@ -22,7 +22,7 @@ export const en = {
     deltaWeek: 'Δ week',
     scoreHistory: 'Score history (12w)',
     scoreHistoryRange: 'Range: last 12 weeks.',
-    scoreHistoryEmpty: 'No data yet. It will fill when the job has saved scores (use Refresh).',
+    scoreHistoryEmpty: 'No data yet. Click Refresh to run the job; after it saves the weekly score, at least one bar will appear here. If you already clicked Refresh and it stays empty, redeploy so the API uses the latest version.',
     scoreHistoryTooltip: 'Weekly score for the last 12 weeks. Each bar = one week (Monday–Sunday). Hover a bar to see date and score.',
     scoreHistoryCaption: '0–8 = number of indicators in green. Each bar = 1 week.',
     scoreHistoryWhatItIs: 'Each bar is that week’s score: how many indicators were GREEN (0–8). It is the value from the last run that week (one moment, not a 7-day average). Not compared to another series.',

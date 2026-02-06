@@ -211,6 +211,7 @@ export default function DashboardPage() {
                   const scoreNum = Number(s.score);
                   const maxScore = 8;
                   const pct = Math.min(100, (scoreNum / maxScore) * 100);
+                  const barHeightPct = Math.max(10, pct);
                   const barColor =
                     scoreNum >= 5 ? 'bg-green-500' : scoreNum >= 3 ? 'bg-amber-500' : scoreNum >= 1 ? 'bg-red-400' : 'bg-gray-300';
                   return (
@@ -226,7 +227,7 @@ export default function DashboardPage() {
                       </span>
                       <div
                         className={`w-full ${barColor} rounded-t min-h-[2px]`}
-                        style={{ height: `${Math.max(2, pct)}%` }}
+                        style={{ height: `${barHeightPct}%` }}
                       />
                     </div>
                   );
