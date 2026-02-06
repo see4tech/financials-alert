@@ -4,7 +4,8 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { NavBar } from '@/app/components/NavBar';
 import { useLocale } from '@/app/context/LocaleContext';
-import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory } from '@/lib/api';
+import { getSupabaseBrowser } from '@/lib/supabase';
+import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, fetchRecommendations, type AiRecommendation } from '@/lib/api';
 
 type Indicator = { key: string; value?: number; trend: string; status: string; explain?: string; ma21d?: number; referenceText?: string };
 type Recommendation = { id: string; tickers?: string[] };
@@ -37,6 +38,31 @@ export default function DashboardPage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [hoveredSummaryCard, setHoveredSummaryCard] = useState<'weeklyScore' | 'scoreHistory' | null>(null);
   const [hoveredScoreBar, setHoveredScoreBar] = useState<{ week_start_date: string; score: number } | null>(null);
+  const [userAssets, setUserAssets] = useState<{ id: string; symbol: string; asset_type: string }[]>([]);
+  const [newAssetSymbol, setNewAssetSymbol] = useState('');
+  const [newAssetType, setNewAssetType] = useState<string>('stock');
+  const [addAssetLoading, setAddAssetLoading] = useState(false);
+  const [recsLoading, setRecsLoading] = useState(false);
+  const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[] | null>(null);
+  const [recsError, setRecsError] = useState<string | null>(null);
+
+  const loadUserAssets = useCallback(() => {
+    const client = getSupabaseBrowser();
+    if (!client) return;
+    client.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.user?.id) return;
+      client
+        .from('user_assets')
+        .select('id, symbol, asset_type')
+        .eq('user_id', session.user.id)
+        .order('created_at', { ascending: true })
+        .then(({ data }) => setUserAssets(Array.isArray(data) ? data : []));
+    });
+  }, []);
+
+  useEffect(() => {
+    loadUserAssets();
+  }, [loadUserAssets]);
 
   useEffect(() => {
     refreshData()
@@ -91,6 +117,56 @@ export default function DashboardPage() {
     },
     [t],
   );
+
+  const handleAddAsset = useCallback(async (e: React.FormEvent) => {
+    e.preventDefault();
+    const sym = newAssetSymbol.trim().toUpperCase();
+    if (!sym) return;
+    const client = getSupabaseBrowser();
+    if (!client) return;
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.user?.id) return;
+    setAddAssetLoading(true);
+    try {
+      const { error } = await client.from('user_assets').insert({
+        user_id: session.user.id,
+        symbol: sym,
+        asset_type: newAssetType,
+      });
+      if (error) throw error;
+      setNewAssetSymbol('');
+      loadUserAssets();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setAddAssetLoading(false);
+    }
+  }, [newAssetSymbol, newAssetType, loadUserAssets]);
+
+  const handleRemoveAsset = useCallback(async (id: string) => {
+    const client = getSupabaseBrowser();
+    if (!client) return;
+    const { error } = await client.from('user_assets').delete().eq('id', id);
+    if (!error) loadUserAssets();
+  }, [loadUserAssets]);
+
+  const handleGenerateRecommendations = useCallback(async () => {
+    const client = getSupabaseBrowser();
+    if (!client) return;
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.access_token) return;
+    setRecsError(null);
+    setRecsLoading(true);
+    setAiRecommendations(null);
+    try {
+      const { recommendations } = await fetchRecommendations(session.access_token);
+      setAiRecommendations(recommendations || []);
+    } catch (e) {
+      setRecsError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setRecsLoading(false);
+    }
+  }, []);
 
   if (loading) return <div className="p-8">{t('common.loading')}</div>;
   if (error) {
@@ -349,6 +425,88 @@ export default function DashboardPage() {
               </div>
             );
           })}
+        </div>
+      )}
+
+      <h2 className="text-xl font-semibold mb-4">{t('dashboard.myAssets')}</h2>
+      <p className="text-sm text-gray-600 mb-3">{t('dashboard.myAssetsHint')}</p>
+      <div className="mb-6 flex flex-wrap items-end gap-3">
+        <form onSubmit={handleAddAsset} className="flex flex-wrap items-end gap-2">
+          <div>
+            <label htmlFor="asset-symbol" className="block text-xs font-medium text-gray-600 mb-1">{t('dashboard.assetSymbol')}</label>
+            <input
+              id="asset-symbol"
+              type="text"
+              value={newAssetSymbol}
+              onChange={(e) => setNewAssetSymbol(e.target.value)}
+              placeholder="AAPL, QQQ, BTC, GOLD"
+              className="border border-gray-300 rounded px-3 py-2 text-sm w-32"
+            />
+          </div>
+          <div>
+            <label htmlFor="asset-type" className="block text-xs font-medium text-gray-600 mb-1">{t('dashboard.assetType')}</label>
+            <select
+              id="asset-type"
+              value={newAssetType}
+              onChange={(e) => setNewAssetType(e.target.value)}
+              className="border border-gray-300 rounded px-3 py-2 text-sm"
+            >
+              <option value="stock">{t('dashboard.assetTypeStock')}</option>
+              <option value="etf">{t('dashboard.assetTypeEtf')}</option>
+              <option value="commodity">{t('dashboard.assetTypeCommodity')}</option>
+              <option value="crypto">{t('dashboard.assetTypeCrypto')}</option>
+            </select>
+          </div>
+          <button type="submit" disabled={addAssetLoading || !newAssetSymbol.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
+            {addAssetLoading ? t('common.loading') : t('dashboard.addAsset')}
+          </button>
+        </form>
+      </div>
+      {userAssets.length > 0 && (
+        <>
+          <ul className="flex flex-wrap gap-2 mb-3">
+            {userAssets.map((a) => (
+              <li key={a.id} className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-sm">
+                <span>{a.symbol}</span>
+                <span className="text-gray-500 text-xs">({t('dashboard.assetType' + (a.asset_type === 'stock' ? 'Stock' : a.asset_type === 'etf' ? 'Etf' : a.asset_type === 'commodity' ? 'Commodity' : 'Crypto')})})</span>
+                <button type="button" onClick={() => handleRemoveAsset(a.id)} className="text-red-600 hover:underline text-xs" aria-label={t('dashboard.removeAsset')}>
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            onClick={handleGenerateRecommendations}
+            disabled={recsLoading}
+            className="rounded-lg bg-gray-700 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 mb-4"
+          >
+            {recsLoading ? t('common.loading') : t('dashboard.generateRecommendations')}
+          </button>
+          <p className="text-xs text-gray-500 mb-2">{t('dashboard.configureLlmHint')}</p>
+        </>
+      )}
+      {userAssets.length === 0 && <p className="text-sm text-gray-500 mb-6">{t('dashboard.noAssetsHint')}</p>}
+      {recsError && <p className="text-sm text-red-600 mb-4">{recsError}</p>}
+      {aiRecommendations && aiRecommendations.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+          {aiRecommendations.map((rec, i) => (
+            <div key={rec.symbol + String(i)} className="border rounded-lg p-4 bg-white shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <span className="font-semibold">{rec.symbol}</span>
+                <span className={`text-sm font-medium ${rec.action === 'buy' ? 'text-green-600' : rec.action === 'sell' ? 'text-red-600' : 'text-gray-600'}`}>
+                  {rec.action === 'buy' ? t('dashboard.actionBuy') : rec.action === 'sell' ? t('dashboard.actionSell') : t('dashboard.actionHold')}
+                </span>
+              </div>
+              <dl className="text-sm space-y-1">
+                {rec.entry_price != null && <><dt className="inline font-medium">{t('dashboard.entryPrice')}:</dt> <dd className="inline">{rec.entry_price}</dd></>}
+                {rec.exit_price != null && <><dt className="inline font-medium ml-2">{t('dashboard.exitPrice')}:</dt> <dd className="inline">{rec.exit_price}</dd></>}
+                {rec.take_profit != null && <><dt className="inline font-medium block">{t('dashboard.takeProfit')}:</dt> <dd className="inline">{rec.take_profit}</dd></>}
+                {rec.stop_loss != null && <><dt className="inline font-medium ml-2">{t('dashboard.stopLoss')}:</dt> <dd className="inline">{rec.stop_loss}</dd></>}
+              </dl>
+              {rec.reasoning && <p className="text-xs text-gray-600 mt-2">{rec.reasoning}</p>}
+            </div>
+          ))}
         </div>
       )}
 

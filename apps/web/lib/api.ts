@@ -111,6 +111,26 @@ export async function saveLlmSettings(
   return res.json();
 }
 
+export type AiRecommendation = {
+  symbol: string;
+  action: string;
+  entry_price?: number;
+  exit_price?: number;
+  take_profit?: number;
+  stop_loss?: number;
+  reasoning?: string;
+};
+
+export async function fetchRecommendations(accessToken: string): Promise<{ recommendations: AiRecommendation[] }> {
+  const res = await fetch(`${API_BASE}/api/recommendations`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({}),
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
 /** One-time backfill: load 90 days of history for all indicators. Uses same secret as run-jobs (CRON_SECRET). */
 export async function triggerBackfillHistory(cronSecret?: string): Promise<{ ok: boolean; message?: string; results?: Record<string, { raw: number; points: number }> }> {
   const base = typeof window !== 'undefined' ? '' : API_BASE || 'http://localhost:3000';
