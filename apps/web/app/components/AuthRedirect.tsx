@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { getSupabaseBrowser } from '@/lib/supabase';
+import { useSupabaseAuthReady } from '@/app/context/SupabaseAuthContext';
 
 const PROTECTED_PREFIXES = ['/dashboard', '/indicators', '/alerts'];
 const PUBLIC_PATHS = ['/login', '/signup'];
@@ -15,6 +16,7 @@ function isProtectedPath(pathname: string): boolean {
 export function AuthRedirect({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  const clientReady = useSupabaseAuthReady();
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
@@ -27,9 +29,15 @@ export function AuthRedirect({ children }: { children: React.ReactNode }) {
       setChecked(true);
       return;
     }
+    if (!clientReady) return;
     let cancelled = false;
-    getSupabaseBrowser()
-      .auth.getSession()
+    const client = getSupabaseBrowser();
+    if (!client) {
+      setChecked(true);
+      return;
+    }
+    client.auth
+      .getSession()
       .then(({ data: { session } }) => {
         if (cancelled) return;
         if (!session) router.replace('/login');
@@ -44,7 +52,7 @@ export function AuthRedirect({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [pathname, router]);
+  }, [pathname, router, clientReady]);
 
   if (!checked && isProtectedPath(pathname ?? '')) {
     return null;

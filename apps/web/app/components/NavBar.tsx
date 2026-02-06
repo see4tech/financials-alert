@@ -4,29 +4,36 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLocale } from '@/app/context/LocaleContext';
+import { useSupabaseAuthReady } from '@/app/context/SupabaseAuthContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
 
 export function NavBar() {
   const { t, locale, setLocale } = useLocale();
   const router = useRouter();
+  const clientReady = useSupabaseAuthReady();
   const [session, setSession] = useState<boolean | null>(null);
 
   useEffect(() => {
-    getSupabaseBrowser()
-      .auth.getSession()
-      .then(({ data: { session: s } }) => setSession(!!s));
+    if (!clientReady) return;
+    const client = getSupabaseBrowser();
+    if (!client) {
+      setSession(true);
+      return;
+    }
+    client.auth.getSession().then(({ data: { session: s } }) => setSession(!!s));
     const {
       data: { subscription },
-    } = getSupabaseBrowser().auth.onAuthStateChange(() => {
-      getSupabaseBrowser()
-        .auth.getSession()
-        .then(({ data: { session: s } }) => setSession(!!s));
+    } = client.auth.onAuthStateChange(() => {
+      client.auth.getSession().then(({ data: { session: s } }) => setSession(!!s));
     });
     return () => subscription.unsubscribe();
-  }, []);
+  }, [clientReady]);
 
   async function handleLogout() {
-    await getSupabaseBrowser().auth.signOut();
+    const client = getSupabaseBrowser();
+    if (client) {
+      await client.auth.signOut();
+    }
     router.push('/login');
     router.refresh();
   }

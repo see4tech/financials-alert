@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LocaleProvider } from '@/app/context/LocaleContext';
+import { SupabaseAuthProvider } from '@/app/context/SupabaseAuthContext';
 import { AuthRedirect } from '@/app/components/AuthRedirect';
 import './globals.css';
 
@@ -17,7 +18,9 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
         <LocaleProvider>
-          <AuthRedirect>{children}</AuthRedirect>
+          <SupabaseAuthProvider>
+            <AuthRedirect>{children}</AuthRedirect>
+          </SupabaseAuthProvider>
         </LocaleProvider>
       </body>
     </html>

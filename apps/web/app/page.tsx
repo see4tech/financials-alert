@@ -4,16 +4,25 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { useLocale } from '@/app/context/LocaleContext';
+import { useSupabaseAuthReady } from '@/app/context/SupabaseAuthContext';
 
 export default function Home() {
   const router = useRouter();
   const { t } = useLocale();
+  const clientReady = useSupabaseAuthReady();
   const [resolved, setResolved] = useState(false);
 
   useEffect(() => {
+    if (!clientReady) return;
     let cancelled = false;
-    getSupabaseBrowser()
-      .auth.getSession()
+    const client = getSupabaseBrowser();
+    if (!client) {
+      setResolved(true);
+      router.replace('/dashboard');
+      return;
+    }
+    client.auth
+      .getSession()
       .then(({ data: { session } }) => {
         if (cancelled) return;
         if (session) router.replace('/dashboard');
@@ -29,9 +38,9 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, clientReady]);
 
-  if (!resolved) {
+  if (!clientReady || !resolved) {
     return (
       <main className="min-h-screen flex items-center justify-center p-8">
         <p className="text-gray-500">{t('common.loading')}</p>

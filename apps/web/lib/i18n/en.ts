@@ -16,6 +16,7 @@ export const en = {
     loginError: 'Invalid email or password.',
     signupError: 'Sign up failed. Try another email or check your password.',
     signupSuccess: 'Account created. You are now logged in.',
+    notConfigured: 'Auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY in your environment. You can still use the app via Dashboard.',
   },
   common: {
     loading: 'Loading...',
