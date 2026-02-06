@@ -17,8 +17,8 @@ export const es: typeof en = {
   dashboard: {
     title: 'Panel',
     asOf: 'Actualizado',
-    runJobs: 'Ejecutar jobs',
-    running: 'Ejecutando…',
+    runJobs: 'Actualizar',
+    running: 'Actualizando…',
     weeklyScore: 'Puntuación semanal',
     deltaWeek: 'Δ semana',
     scoreHistory: 'Historial (12 sem)',
@@ -51,6 +51,20 @@ export const es: typeof en = {
         'Escenario favorable: BTC mantiene $60k–$64k con tendencia alcista o cierra por encima de $75k.',
       'sent.fng':
         'Escenario favorable: miedo alto (≤25) que mejora, o zona neutral (26–60).',
+    },
+    indicatorTooltip: {
+      'macro.us10y':
+        'Rendimiento del bono estadounidense a 10 años. Mide el tipo de interés de la deuda pública a 10 años. Lo afectan la política de la Fed, expectativas de inflación y demanda de activos refugio. Fuente: FRED (DGS10).',
+      'macro.dxy':
+        'Índice del dólar estadounidense. Mide el valor del dólar frente a una cesta de monedas (euro, yen, etc.). Lo afectan la Fed, flujos comerciales y sentimiento de riesgo. Fuente: Twelve Data (UUP/ETF).',
+      'eq.nasdaq':
+        'Nasdaq-100 (vía ETF QQQ). Sigue a las 100 mayores empresas no financieras del Nasdaq. Lo afectan resultados tecnológicos, tipos de interés y apetito por riesgo. Fuente: Twelve Data.',
+      'eq.leaders':
+        'Líderes mega-cap: NVDA, MSFT, AAPL, GOOGL. Vista compuesta de nombres clave tech/crecimiento. Fuente: Twelve Data.',
+      'crypto.btc':
+        'Precio spot de Bitcoin (USD). Lo afectan macro, flujos institucionales y sentimiento. Fuente: CoinGecko.',
+      'sent.fng':
+        'Índice Miedo y Codicia (0–100). Mide el sentimiento de mercado con encuestas y volatilidad. Bajo = miedo, alto = codicia. Fuente: Alternative.me.',
     },
     scenarioValue: {
       bull: {

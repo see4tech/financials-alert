@@ -15,8 +15,8 @@ export const en = {
   dashboard: {
     title: 'Dashboard',
     asOf: 'As of',
-    runJobs: 'Run jobs now',
-    running: 'Running…',
+    runJobs: 'Refresh',
+    running: 'Refreshing…',
     weeklyScore: 'Weekly Score',
     deltaWeek: 'Δ week',
     scoreHistory: 'Score history (12w)',
@@ -48,6 +48,20 @@ export const en = {
         'Favorable scenario: BTC holds $60k–$64k with rising trend or closes above $75k.',
       'sent.fng':
         'Favorable scenario: high fear (≤25) improving, or neutral zone (26–60).',
+    },
+    indicatorTooltip: {
+      'macro.us10y':
+        'US 10-year Treasury yield. Measures the interest rate on 10-year US government debt. Affected by Fed policy, inflation expectations, and demand for safe assets. Source: FRED (DGS10).',
+      'macro.dxy':
+        'US Dollar Index. Measures the value of the US dollar against a basket of major currencies (euro, yen, etc.). Affected by Fed policy, trade flows, and risk sentiment. Source: Twelve Data (UUP/ETF).',
+      'eq.nasdaq':
+        'Nasdaq-100 (via QQQ ETF). Tracks the performance of the 100 largest non-financial companies on Nasdaq. Affected by tech earnings, rates, and risk appetite. Source: Twelve Data.',
+      'eq.leaders':
+        'Mega-cap leaders: NVDA, MSFT, AAPL, GOOGL. Composite view of key tech/growth names. Source: Twelve Data.',
+      'crypto.btc':
+        'Bitcoin spot price (USD). Affected by macro, institutional flows, and sentiment. Source: CoinGecko.',
+      'sent.fng':
+        'Fear & Greed Index (0–100). Measures market sentiment from surveys and volatility. Low = fear, high = greed. Source: Alternative.me.',
     },
     scenarioValue: {
       bull: {
