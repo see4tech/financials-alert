@@ -4,6 +4,18 @@ export const en = {
     dashboard: 'Dashboard',
     indicators: 'Indicators',
     alerts: 'Alerts',
+    logout: 'Log out',
+    login: 'Log in',
+    signup: 'Sign up',
+  },
+  auth: {
+    login: 'Log in',
+    signup: 'Sign up',
+    email: 'Email',
+    password: 'Password',
+    loginError: 'Invalid email or password.',
+    signupError: 'Sign up failed. Try another email or check your password.',
+    signupSuccess: 'Account created. You are now logged in.',
   },
   common: {
     loading: 'Loading...',

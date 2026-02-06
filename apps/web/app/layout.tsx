@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { LocaleProvider } from '@/app/context/LocaleContext';
+import { AuthRedirect } from '@/app/components/AuthRedirect';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -15,7 +16,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
-        <LocaleProvider>{children}</LocaleProvider>
+        <LocaleProvider>
+          <AuthRedirect>{children}</AuthRedirect>
+        </LocaleProvider>
       </body>
     </html>
   );

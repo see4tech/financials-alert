@@ -6,6 +6,18 @@ export const es: typeof en = {
     dashboard: 'Panel',
     indicators: 'Indicadores',
     alerts: 'Alertas',
+    logout: 'Cerrar sesión',
+    login: 'Iniciar sesión',
+    signup: 'Registrarse',
+  },
+  auth: {
+    login: 'Iniciar sesión',
+    signup: 'Registrarse',
+    email: 'Correo electrónico',
+    password: 'Contraseña',
+    loginError: 'Correo o contraseña incorrectos.',
+    signupError: 'Error al registrarse. Prueba otro correo o revisa la contraseña.',
+    signupSuccess: 'Cuenta creada. Ya has iniciado sesión.',
   },
   common: {
     loading: 'Cargando...',

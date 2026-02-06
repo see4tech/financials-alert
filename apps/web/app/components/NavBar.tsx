@@ -1,23 +1,69 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useLocale } from '@/app/context/LocaleContext';
+import { getSupabaseBrowser } from '@/lib/supabase';
+
 export function NavBar() {
   const { t, locale, setLocale } = useLocale();
+  const router = useRouter();
+  const [session, setSession] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    getSupabaseBrowser()
+      .auth.getSession()
+      .then(({ data: { session: s } }) => setSession(!!s));
+    const {
+      data: { subscription },
+    } = getSupabaseBrowser().auth.onAuthStateChange(() => {
+      getSupabaseBrowser()
+        .auth.getSession()
+        .then(({ data: { session: s } }) => setSession(!!s));
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  async function handleLogout() {
+    await getSupabaseBrowser().auth.signOut();
+    router.push('/login');
+    router.refresh();
+  }
+
   return (
     <nav className="mb-8 flex flex-wrap items-center gap-4">
-      <Link href="/" className="text-blue-600 hover:underline">
-        {t('nav.home')}
-      </Link>
-      <Link href="/dashboard" className="text-blue-600 hover:underline">
-        {t('nav.dashboard')}
-      </Link>
-      <Link href="/indicators" className="text-blue-600 hover:underline">
-        {t('nav.indicators')}
-      </Link>
-      <Link href="/alerts" className="text-blue-600 hover:underline">
-        {t('nav.alerts')}
-      </Link>
+      {session === true && (
+        <>
+          <Link href="/dashboard" className="text-blue-600 hover:underline">
+            {t('nav.dashboard')}
+          </Link>
+          <Link href="/indicators" className="text-blue-600 hover:underline">
+            {t('nav.indicators')}
+          </Link>
+          <Link href="/alerts" className="text-blue-600 hover:underline">
+            {t('nav.alerts')}
+          </Link>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="text-blue-600 hover:underline ml-auto"
+          >
+            {t('nav.logout')}
+          </button>
+        </>
+      )}
+      {(session === false || session === null) && (
+        <>
+          <Link href="/login" className="text-blue-600 hover:underline">
+            {t('nav.login')}
+          </Link>
+          <Link href="/signup" className="text-blue-600 hover:underline">
+            {t('nav.signup')}
+          </Link>
+          <span className="ml-auto" />
+        </>
+      )}
       <span className="ml-auto flex gap-2 text-sm">
         <button
           type="button"

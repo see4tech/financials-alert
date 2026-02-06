@@ -11,12 +11,41 @@ export class IndicatorsService {
 
   async getHistory(key: string, range: string, _granularity: string) {
     const since = this.parseRange(range);
+    if (key === 'eq.leaders') {
+      return this.getHistoryEqLeaders(since);
+    }
     const points = await this.pointsRepo.find({
       where: { indicator_key: key, ts: MoreThan(since) },
       order: { ts: 'ASC' },
       take: 500,
     });
     return { key, granularity: '1d', data: points };
+  }
+
+  private async getHistoryEqLeaders(since: Date): Promise<{ key: string; granularity: string; data: Array<{ ts: string; value: number }> }> {
+    const constituents = ['eq.leaders.NVDA', 'eq.leaders.MSFT', 'eq.leaders.AAPL', 'eq.leaders.GOOGL'];
+    const allPoints: Array<{ ts: Date; value: number }> = [];
+    for (const c of constituents) {
+      const rows = await this.pointsRepo.find({
+        where: { indicator_key: c, ts: MoreThan(since) },
+        order: { ts: 'ASC' },
+        take: 500,
+      });
+      for (const row of rows) {
+        const r = row as { ts: Date; value: unknown };
+        allPoints.push({ ts: r.ts instanceof Date ? r.ts : new Date(r.ts), value: Number(r.value) });
+      }
+    }
+    const byDay = new Map<string, number[]>();
+    for (const p of allPoints) {
+      const day = p.ts.toISOString().slice(0, 10);
+      if (!byDay.has(day)) byDay.set(day, []);
+      byDay.get(day)!.push(p.value);
+    }
+    const data = Array.from(byDay.entries())
+      .map(([day, vals]) => ({ ts: `${day}T12:00:00.000Z`, value: vals.reduce((a, b) => a + b, 0) / vals.length }))
+      .sort((a, b) => a.ts.localeCompare(b.ts));
+    return { key: 'eq.leaders', granularity: '1d', data };
   }
 
   async getScoreHistory(range: string) {
