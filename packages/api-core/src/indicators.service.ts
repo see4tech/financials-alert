@@ -21,12 +21,21 @@ export class IndicatorsService {
 
   async getScoreHistory(range: string) {
     const since = this.parseRange(range);
-    const scores = await this.scoresRepo.find({
-      where: { week_start_date: MoreThan(since.toISOString().slice(0, 10)) },
-      order: { week_start_date: 'ASC' },
+    const sinceStr = since.toISOString().slice(0, 10);
+    const all = await this.scoresRepo.find({
+      where: { week_start_date: MoreThan(sinceStr) },
+      order: { week_start_date: 'DESC' },
       take: 52,
     });
-    return { data: scores };
+    // One row per week (latest score per week in case of duplicates)
+    const byWeek = new Map<string, { week_start_date: string; score: number }>();
+    for (const row of all) {
+      const w = String((row as { week_start_date?: string }).week_start_date).slice(0, 10);
+      if (!byWeek.has(w)) byWeek.set(w, { week_start_date: w, score: Number((row as { score?: number }).score) });
+    }
+    const sorted = Array.from(byWeek.values()).sort((a, b) => a.week_start_date.localeCompare(b.week_start_date));
+    const last12 = sorted.slice(-12);
+    return { data: last12 };
   }
 
   private parseRange(range: string): Date {
