@@ -1,10 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { NavBar } from '@/app/components/NavBar';
+import { useLocale } from '@/app/context/LocaleContext';
 import { fetchAlertsHistory, fetchRules } from '@/lib/api';
 
 export default function AlertsPage() {
+  const { t } = useLocale();
   const [fired, setFired] = useState<{ id: string; rule_id: string; ts: string; payload?: unknown }[]>([]);
   const [rules, setRules] = useState<{ id: string; json_rule: Record<string, unknown>; is_enabled: boolean }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,35 +22,31 @@ export default function AlertsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div className="p-8">Loading...</div>;
-  if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
+  if (loading) return <div className="p-8">{t('common.loading')}</div>;
+  if (error) return <div className="p-8 text-red-600">{t('common.error')}: {error}</div>;
 
   return (
     <main className="min-h-screen p-8 max-w-4xl mx-auto">
-      <nav className="mb-8 flex gap-4">
-        <Link href="/" className="text-blue-600 hover:underline">Home</Link>
-        <Link href="/dashboard" className="text-blue-600 hover:underline">Dashboard</Link>
-        <Link href="/indicators" className="text-blue-600 hover:underline">Indicators</Link>
-      </nav>
-      <h1 className="text-2xl font-bold mb-6">Alerts</h1>
+      <NavBar />
+      <h1 className="text-2xl font-bold mb-6">{t('alerts.title')}</h1>
 
       <section className="mb-8">
-        <h2 className="text-lg font-semibold mb-4">Rules</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('alerts.rules')}</h2>
         <ul className="space-y-2">
           {rules.map((r) => (
             <li key={r.id} className="border rounded p-3 flex justify-between items-center">
               <span className="font-mono text-sm">{String(r.json_rule?.name ?? r.id)}</span>
               <span className={r.is_enabled ? 'text-green-600' : 'text-gray-400'}>
-                {r.is_enabled ? 'On' : 'Off'}
+                {r.is_enabled ? t('alerts.on') : t('alerts.off')}
               </span>
             </li>
           ))}
         </ul>
-        {rules.length === 0 && <p className="text-gray-500">No rules. Create rules via API.</p>}
+        {rules.length === 0 && <p className="text-gray-500">{t('alerts.noRules')}</p>}
       </section>
 
       <section>
-        <h2 className="text-lg font-semibold mb-4">Fired alerts (30d)</h2>
+        <h2 className="text-lg font-semibold mb-4">{t('alerts.firedAlerts')}</h2>
         <ul className="space-y-2">
           {fired.map((a) => (
             <li key={a.id} className="border rounded p-3 text-sm">
@@ -57,7 +55,7 @@ export default function AlertsPage() {
             </li>
           ))}
         </ul>
-        {fired.length === 0 && <p className="text-gray-500">No alerts fired.</p>}
+        {fired.length === 0 && <p className="text-gray-500">{t('alerts.noFired')}</p>}
       </section>
     </main>
   );

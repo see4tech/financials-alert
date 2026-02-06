@@ -1,17 +1,20 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useState, useCallback } from 'react';
+import { NavBar } from '@/app/components/NavBar';
+import { useLocale } from '@/app/context/LocaleContext';
 import { fetchIndicatorHistory } from '@/lib/api';
 
-const CORE_KEYS = ['macro.us10y', 'macro.dxy', 'eq.nasdaq', 'eq.leaders', 'crypto.btc', 'sent.fng'];
+type Point = { ts: string; value: number };
 
 export function IndicatorDetailClient({ keyParam }: { keyParam: string }) {
   const key = keyParam;
-  const [data, setData] = useState<{ data: { ts: string; value: number }[] } | null>(null);
+  const { t, locale } = useLocale();
+  const [data, setData] = useState<{ data: Point[] } | null>(null);
   const [range, setRange] = useState<'30d' | '90d'>('30d');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hoveredBar, setHoveredBar] = useState<{ point: Point; x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!key) return;
@@ -21,80 +24,103 @@ export function IndicatorDetailClient({ keyParam }: { keyParam: string }) {
       .finally(() => setLoading(false));
   }, [key, range]);
 
+  const localeCode = locale === 'es' ? 'es' : 'en';
+  const formatDate = useCallback(
+    (ts: string) => new Date(ts).toLocaleDateString(localeCode, { month: 'short', day: 'numeric' }),
+    [localeCode],
+  );
+  const formatDateShort = useCallback(
+    (ts: string) => new Date(ts).toLocaleDateString(localeCode, { day: 'numeric', month: 'numeric' }),
+    [localeCode],
+  );
+
   if (!key) return null;
-  if (loading) return <div className="p-8">Loading...</div>;
-  if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
+  if (loading) return <div className="p-8">{t('common.loading')}</div>;
+  if (error) return <div className="p-8 text-red-600">{t('common.error')}: {error}</div>;
 
   const points = data?.data || [];
   const maxVal = Math.max(...points.map((p) => p.value), 1);
   const minVal = Math.min(...points.map((p) => p.value), 0);
   const rangeVal = maxVal - minVal || 1;
   const yTicks = [minVal, minVal + rangeVal * 0.5, maxVal].filter((v, i, a) => a.indexOf(v) === i);
-  const formatDate = (ts: string) => new Date(ts).toLocaleDateString('es', { month: 'short', day: 'numeric' });
-  const xStep = Math.max(1, Math.floor(points.length / 7));
+  const xStep = Math.max(1, Math.floor(points.length / 5));
+  const useShortDate = points.length > 14;
+  const xFormat = useShortDate ? formatDateShort : formatDate;
 
   return (
     <main className="min-h-screen p-8 max-w-4xl mx-auto">
-      <nav className="mb-8 flex gap-4">
-        <Link href="/" className="text-blue-600 hover:underline">Home</Link>
-        <Link href="/dashboard" className="text-blue-600 hover:underline">Dashboard</Link>
-        <Link href="/indicators" className="text-blue-600 hover:underline">Indicators</Link>
-        <Link href="/alerts" className="text-blue-600 hover:underline">Alerts</Link>
-      </nav>
+      <NavBar />
       <h1 className="text-2xl font-bold mb-4">{key}</h1>
       <div className="mb-4 flex gap-2">
         <button
           onClick={() => setRange('30d')}
           className={`px-3 py-1 rounded ${range === '30d' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
         >
-          30D
+          {t('indicatorsDetail.period30')}
         </button>
         <button
           onClick={() => setRange('90d')}
           className={`px-3 py-1 rounded ${range === '90d' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
         >
-          90D
+          {t('indicatorsDetail.period90')}
         </button>
       </div>
       {points.length === 0 ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
-          <p className="font-medium">No history yet</p>
-          <p className="mt-1 text-sm">
-            Indicator data is populated by a scheduled job (every 15 min). Wait for the next run or trigger{' '}
-            <code className="rounded bg-amber-100 px-1 text-xs">/.netlify/functions/run-jobs</code> manually.
-          </p>
+          <p className="font-medium">{t('indicatorsDetail.noHistory')}</p>
+          <p className="mt-1 text-sm">{t('indicatorsDetail.noHistoryHint')}</p>
         </div>
       ) : (
-        <div className="border rounded-lg p-4 bg-white">
+        <div className="border rounded-lg p-4 bg-white relative">
           <div className="flex gap-2 h-56">
             <div className="flex flex-col justify-between text-right text-xs text-gray-500 pr-2 shrink-0">
-              {yTicks.map((t) => (
-                <span key={t}>{typeof t === 'number' && t % 1 !== 0 ? t.toFixed(2) : t}</span>
+              {yTicks.map((v) => (
+                <span key={v}>{typeof v === 'number' && v % 1 !== 0 ? v.toFixed(2) : v}</span>
               ))}
             </div>
             <div className="flex-1 flex flex-col min-w-0">
-              <div className="flex items-end gap-px flex-1">
-                {points.map((p) => (
+              <div className="flex items-end gap-px flex-1 relative">
+                {points.map((p, i) => (
                   <div
                     key={p.ts}
                     className="flex-1 bg-blue-500 rounded-t min-w-0"
                     style={{
                       height: `${maxVal === minVal ? 100 : ((p.value - minVal) / rangeVal) * 100}%`,
                     }}
-                    title={`${formatDate(p.ts)}: ${p.value}`}
+                    onMouseEnter={(e) => {
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      setHoveredBar({
+                        point: p,
+                        x: rect.left + rect.width / 2,
+                        y: rect.top,
+                      });
+                    }}
+                    onMouseLeave={() => setHoveredBar(null)}
                   />
                 ))}
               </div>
               <div className="flex text-xs text-gray-500 mt-1 gap-px">
                 {points.map((p, i) => (
-                  <span key={p.ts} className="flex-1 min-w-0 text-center truncate" style={{ flex: 1 }}>
-                    {i % xStep === 0 ? formatDate(p.ts) : ''}
+                  <span key={p.ts} className="flex-1 min-w-0 text-center" style={{ flex: 1 }}>
+                    {i % xStep === 0 ? xFormat(p.ts) : ''}
                   </span>
                 ))}
               </div>
             </div>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Cada barra = un día. Valor en tooltip al pasar el ratón.</p>
+          {hoveredBar && (
+            <div
+              className="fixed z-50 px-2 py-1 text-xs font-medium bg-gray-800 text-white rounded shadow-lg pointer-events-none"
+              style={{
+                left: hoveredBar.x,
+                top: hoveredBar.y - 32,
+                transform: 'translate(-50%, 0)',
+              }}
+            >
+              {formatDate(hoveredBar.point.ts)}: {hoveredBar.point.value}
+            </div>
+          )}
+          <p className="text-xs text-gray-500 mt-2">{t('indicatorsDetail.chartHint')}</p>
         </div>
       )}
     </main>

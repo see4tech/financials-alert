@@ -1,20 +1,14 @@
-import Link from 'next/link';
+'use client';
+
+import { NavBar } from '@/app/components/NavBar';
+import { useLocale } from '@/app/context/LocaleContext';
 
 export default function Home() {
+  const { t } = useLocale();
   return (
     <main className="min-h-screen p-8">
-      <h1 className="text-2xl font-bold mb-6">Market Health Checklist</h1>
-      <nav className="flex gap-4">
-        <Link href="/dashboard" className="text-blue-600 hover:underline">
-          Dashboard
-        </Link>
-        <Link href="/indicators" className="text-blue-600 hover:underline">
-          Indicators
-        </Link>
-        <Link href="/alerts" className="text-blue-600 hover:underline">
-          Alerts
-        </Link>
-      </nav>
+      <NavBar />
+      <h1 className="text-2xl font-bold mb-6">{t('home.title')}</h1>
     </main>
   );
 }
