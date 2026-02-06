@@ -25,5 +25,8 @@
   },
   "devDependencies": {
     "@netlify/functions": "^2.8.0"
+  },
+  "optionalDependencies": {
+    "@next/swc-linux-x64-gnu": "14.2.0"
   }
 }

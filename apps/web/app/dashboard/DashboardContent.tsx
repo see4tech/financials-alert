@@ -98,8 +98,7 @@ export function DashboardContent(props: DashboardContentProps) {
     hoveredCard,
   } = props;
 
-  return (
-    <div role="main" className="min-h-screen p-8 max-w-6xl mx-auto">
+  return (<div role="main" className="min-h-screen p-8 max-w-6xl mx-auto">
       <NavBar />
 
       <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
