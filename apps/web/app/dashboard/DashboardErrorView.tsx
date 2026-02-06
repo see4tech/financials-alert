@@ -25,7 +25,8 @@ export function DashboardErrorView(props: DashboardErrorViewProps) {
     setCronSecretInput,
   } = props;
 
-  return (<main className="min-h-screen p-8 max-w-6xl mx-auto">
+  return (
+    <main className="min-h-screen p-8 max-w-6xl mx-auto">
       <NavBar />
       <div className="mb-4 text-red-600">{t('common.error')}: {error}</div>
       <p className="mb-4 text-sm text-gray-600">{t('dashboard.errorHint')}</p>
