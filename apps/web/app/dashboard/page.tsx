@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { NavBar } from '@/app/components/NavBar';
 import { useLocale } from '@/app/context/LocaleContext';
-import { fetchDashboard, fetchScoreHistory, triggerRunJobs } from '@/lib/api';
+import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory } from '@/lib/api';
 
 type Indicator = { key: string; value?: number; trend: string; status: string; explain?: string; ma21d?: number; referenceText?: string };
 type Recommendation = { id: string; tickers?: string[] };
@@ -29,6 +29,9 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [runJobsLoading, setRunJobsLoading] = useState(false);
   const [runJobsError, setRunJobsError] = useState<string | null>(null);
+  const [backfillLoading, setBackfillLoading] = useState(false);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
+  const [backfillSuccess, setBackfillSuccess] = useState<string | null>(null);
   const [cronSecretPrompt, setCronSecretPrompt] = useState(false);
   const [cronSecretInput, setCronSecretInput] = useState('');
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
@@ -66,6 +69,27 @@ export default function DashboardPage() {
       }
     },
     [],
+  );
+
+  const runBackfillNow = useCallback(
+    async (secret?: string) => {
+      setBackfillError(null);
+      setBackfillSuccess(null);
+      setBackfillLoading(true);
+      try {
+        await triggerBackfillHistory(secret);
+        setCronSecretPrompt(false);
+        setCronSecretInput('');
+        setBackfillSuccess(t('dashboard.backfillSuccess'));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        if (msg.includes('Cron secret required')) setCronSecretPrompt(true);
+        else setBackfillError(msg);
+      } finally {
+        setBackfillLoading(false);
+      }
+    },
+    [t],
   );
 
   if (loading) return <div className="p-8">{t('common.loading')}</div>;
@@ -126,7 +150,7 @@ export default function DashboardPage() {
           <p className="text-sm text-gray-500 mt-1">{t('dashboard.asOf')}: {new Date(data.asOf).toLocaleString()}</p>
           <p className="text-xs text-gray-400 mt-0.5">{t('dashboard.refreshHint')}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
             type="button"
             onClick={() => runJobsNow()}
@@ -135,7 +159,18 @@ export default function DashboardPage() {
           >
             {runJobsLoading ? t('dashboard.running') : t('dashboard.runJobs')}
           </button>
+          <button
+            type="button"
+            onClick={() => runBackfillNow(cronSecretInput.trim() || undefined)}
+            disabled={backfillLoading}
+            className="rounded-lg bg-gray-600 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            title={t('dashboard.backfillHint')}
+          >
+            {backfillLoading ? t('dashboard.backfilling') : t('dashboard.backfillHistory')}
+          </button>
           {runJobsError && <p className="text-sm text-red-600">{runJobsError}</p>}
+          {backfillError && <p className="text-sm text-red-600">{backfillError}</p>}
+          {backfillSuccess && <p className="text-sm text-green-600">{backfillSuccess}</p>}
         </div>
       </div>
       {cronSecretPrompt && (
@@ -161,7 +196,15 @@ export default function DashboardPage() {
           </button>
           <button
             type="button"
-            onClick={() => { setCronSecretPrompt(false); setRunJobsError(null); }}
+            onClick={() => runBackfillNow(cronSecretInput)}
+            disabled={backfillLoading || !cronSecretInput.trim()}
+            className="rounded bg-gray-600 px-3 py-1 text-sm text-white hover:bg-gray-700 disabled:opacity-50"
+          >
+            {t('dashboard.backfillWithSecret')}
+          </button>
+          <button
+            type="button"
+            onClick={() => { setCronSecretPrompt(false); setRunJobsError(null); setBackfillError(null); }}
             className="text-sm underline"
           >
             {t('dashboard.cancel')}

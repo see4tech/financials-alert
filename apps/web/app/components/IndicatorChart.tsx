@@ -23,11 +23,11 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
     if (!indicatorKey) return;
     setLoading(true);
     setError(null);
-    fetchIndicatorHistory(indicatorKey, range, '1d')
+    fetchIndicatorHistory(indicatorKey, '90d', '1d')
       .then(setData)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [indicatorKey, range]);
+  }, [indicatorKey]);
 
   const localeCode = locale === 'es' ? 'es' : 'en';
   const formatDate = useCallback(
@@ -56,15 +56,26 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
     );
   }
 
-  const points = data?.data || [];
-  const maxVal = points.length ? Math.max(...points.map((p) => p.value)) : 1;
-  const minVal = points.length ? Math.min(...points.map((p) => p.value)) : 0;
+  const allPoints = data?.data || [];
+  const displayedPoints = range === '30d' && allPoints.length > 30
+    ? allPoints.slice(-30)
+    : allPoints;
+  const points = displayedPoints;
+  const maxVal = allPoints.length ? Math.max(...allPoints.map((p) => p.value)) : 1;
+  const minVal = allPoints.length ? Math.min(...allPoints.map((p) => p.value)) : 0;
   const rangeVal = maxVal - minVal || 1;
   const yTicks = [maxVal, minVal + rangeVal * 0.5, minVal].filter((v, i, a) => a.indexOf(v) === i);
   const xStep = Math.max(1, Math.floor(points.length / 5));
   const useShortDate = points.length > 14;
   const xFormat = useShortDate ? formatDateShort : formatDate;
   const chartHeight = compact ? 'h-40' : 'h-56';
+  const minBarHeightPct = 4;
+
+  const barHeightPct = (p: Point) => {
+    if (maxVal === minVal) return 100;
+    const pct = ((p.value - minVal) / rangeVal) * 100;
+    return Math.max(minBarHeightPct, pct);
+  };
 
   return (
     <div className="relative">
@@ -104,7 +115,7 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
                     key={p.ts}
                     className="flex-1 bg-blue-500 rounded-t min-w-0"
                     style={{
-                      height: `${maxVal === minVal ? 100 : ((p.value - minVal) / rangeVal) * 100}%`,
+                      height: `${barHeightPct(p)}%`,
                     }}
                     onMouseEnter={(e) => {
                       const rect = e.currentTarget.getBoundingClientRect();

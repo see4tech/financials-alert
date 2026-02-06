@@ -68,3 +68,15 @@ export async function triggerRunJobs(cronSecret?: string): Promise<{ ok: boolean
   await throwOnNotOk(res);
   return res.json().catch(() => ({ ok: true }));
 }
+
+/** One-time backfill: load 90 days of history for all indicators. Uses same secret as run-jobs (CRON_SECRET). */
+export async function triggerBackfillHistory(cronSecret?: string): Promise<{ ok: boolean; message?: string; results?: Record<string, { raw: number; points: number }> }> {
+  const base = typeof window !== 'undefined' ? '' : API_BASE || 'http://localhost:3000';
+  const url = `${base}/.netlify/functions/backfill-history`;
+  const headers: Record<string, string> = {};
+  if (cronSecret) headers['X-Cron-Secret'] = cronSecret;
+  const res = await fetch(url, { method: 'POST', headers });
+  if (res.status === 401) throw new Error('Cron secret required. Set CRON_SECRET in Netlify and enter it when prompted.');
+  await throwOnNotOk(res);
+  return res.json();
+}
