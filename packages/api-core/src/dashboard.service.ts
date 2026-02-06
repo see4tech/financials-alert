@@ -3,17 +3,28 @@ import { StatusSnapshot, IndicatorPoint, WeeklyScore } from './entities';
 import { RegistryService } from './registry';
 import type { Repo } from './db-types';
 
+type DerivedRow = { ma_21d?: number | null };
+
 export class DashboardService {
   constructor(
     private readonly snapshotRepo: Repo<StatusSnapshot>,
     private readonly pointsRepo: Repo<IndicatorPoint>,
     private readonly scoreRepo: Repo<WeeklyScore>,
+    private readonly derivedRepo: Repo<DerivedRow>,
     private readonly registry: RegistryService,
   ) {}
 
   async getToday(_timezone: string) {
     const coreKeys = this.registry.getCoreKeys();
-    const indicators: { key: string; value?: number; trend: string; status: string; explain?: string }[] = [];
+    const indicators: {
+      key: string;
+      value?: number;
+      trend: string;
+      status: string;
+      explain?: string;
+      ma21d?: number;
+      referenceText?: string;
+    }[] = [];
     let asOf = new Date();
 
     for (const key of coreKeys) {
@@ -23,12 +34,26 @@ export class DashboardService {
       });
       if (!latest) continue;
       let value: number | undefined;
+      let ma21d: number | undefined;
+      let referenceText: string | undefined;
       if (key !== 'eq.leaders') {
         const latestPoint = await this.pointsRepo.findOne({
           where: { indicator_key: key },
           order: { ts: 'DESC' },
         });
         value = latestPoint ? Number(latestPoint.value) : undefined;
+        const derived = await this.derivedRepo.findOne({
+          where: { indicator_key: key },
+          order: { ts: 'DESC' },
+        });
+        const d = derived as { ma_21d?: number | null } | null;
+        if (d?.ma_21d != null) ma21d = Number(d.ma_21d);
+        if (key === 'crypto.btc') {
+          const config = this.registry.getByKey('crypto.btc');
+          const z = config?.zones;
+          if (z)
+            referenceText = `$${(z.support_low / 1000).toFixed(0)}k–$${(z.support_high / 1000).toFixed(0)}k (zone); <$${(z.bear_line / 1000).toFixed(0)}k red; >$${(z.bull_confirm / 1000).toFixed(0)}k green`;
+        }
       }
       indicators.push({
         key: latest.indicator_key,
@@ -36,6 +61,8 @@ export class DashboardService {
         trend: latest.trend,
         status: latest.status,
         explain: latest.explanation ?? undefined,
+        ...(ma21d != null && { ma21d }),
+        ...(referenceText && { referenceText }),
       });
       if (latest.ts > asOf) asOf = latest.ts;
     }

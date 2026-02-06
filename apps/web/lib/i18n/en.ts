@@ -40,6 +40,8 @@ export const en = {
     runWithSecret: 'Run with secret',
     cancel: 'Cancel',
     errorHint: 'You can try running the data job to populate the database, then refresh.',
+    ma21d: 'MA 21d',
+    referenceLabel: 'Reference:',
     favorableLabel: "What's considered favorable:",
     favorable: {
       'macro.us10y':

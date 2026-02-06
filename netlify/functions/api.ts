@@ -27,6 +27,7 @@ async function getApp(): Promise<express.Express> {
     db.getSnapshotRepo(),
     db.getPointsRepo(),
     db.getScoreRepo(),
+    db.getDerivedRepo(),
     registry,
   );
   const indicatorsService = new IndicatorsService(

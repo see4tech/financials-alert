@@ -6,7 +6,7 @@ import { NavBar } from '@/app/components/NavBar';
 import { useLocale } from '@/app/context/LocaleContext';
 import { fetchDashboard, fetchScoreHistory, triggerRunJobs } from '@/lib/api';
 
-type Indicator = { key: string; value?: number; trend: string; status: string; explain?: string };
+type Indicator = { key: string; value?: number; trend: string; status: string; explain?: string; ma21d?: number; referenceText?: string };
 type Recommendation = { id: string; tickers?: string[] };
 type Dashboard = {
   asOf: string;
@@ -22,7 +22,7 @@ function refreshData(): Promise<[Dashboard, { data: { week_start_date: string; s
 }
 
 export default function DashboardPage() {
-  const { t, translateExplain } = useLocale();
+  const { t, translateExplain, locale } = useLocale();
   const [data, setData] = useState<Dashboard | null>(null);
   const [scoreHistory, setScoreHistory] = useState<{ week_start_date: string; score: number }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -298,7 +298,24 @@ export default function DashboardPage() {
                 <span className="text-xs text-gray-500">{t('status.' + ind.status.toLowerCase())}</span>
               </div>
             </div>
-            {ind.value != null && <p className="text-lg mt-1">{ind.value}</p>}
+            {ind.value != null && (
+              <p className="text-lg mt-1">
+                {ind.value}
+                {ind.ma21d != null && (
+                  <span className="ml-2 text-sm font-normal text-gray-500">
+                    ({t('dashboard.ma21d')}: {ind.ma21d})
+                  </span>
+                )}
+              </p>
+            )}
+            {ind.referenceText && (
+              <p className="text-xs text-gray-500 mt-1">
+                {t('dashboard.referenceLabel')}{' '}
+                {locale === 'es'
+                  ? ind.referenceText.replace(/\bzone\b/g, 'zona').replace(/\bred\b/g, 'rojo').replace(/\bgreen\b/g, 'verde')
+                  : ind.referenceText}
+              </p>
+            )}
             <p className="text-sm text-gray-600 mt-1">{trendArrow(ind.trend)} {t('trend.' + ind.trend.toLowerCase())}</p>
             {ind.explain && <p className="text-xs text-gray-500 mt-2">{translateExplain(ind.explain)}</p>}
             {ind.status === 'UNKNOWN' && ind.explain === 'Data stale' && (

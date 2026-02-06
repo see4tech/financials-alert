@@ -42,6 +42,8 @@ export const es: typeof en = {
     runWithSecret: 'Ejecutar con secret',
     cancel: 'Cancelar',
     errorHint: 'Puedes ejecutar el job de datos para rellenar la base de datos y luego actualizar.',
+    ma21d: 'Media 21 d',
+    referenceLabel: 'Referencia:',
     favorableLabel: 'Qué se considera favorable:',
     favorable: {
       'macro.us10y':
