@@ -197,7 +197,7 @@ export default function DashboardPage() {
           {scoreHistory.length === 0 ? (
             <p className="text-xs text-gray-500 mt-2">—</p>
           ) : (
-            <div className="flex gap-1 h-24 mt-2 items-end">
+            <div className="flex gap-1 h-28 mt-2 items-end">
               <div className="flex flex-col justify-between text-right text-xs text-gray-500 pr-1 shrink-0 h-full">
                 <span>8</span>
                 <span>4</span>
@@ -208,16 +208,21 @@ export default function DashboardPage() {
                   const scoreNum = Number(s.score);
                   const maxScore = 8;
                   const pct = Math.min(100, (scoreNum / maxScore) * 100);
+                  const barColor =
+                    scoreNum >= 5 ? 'bg-green-500' : scoreNum >= 3 ? 'bg-amber-500' : scoreNum >= 1 ? 'bg-red-400' : 'bg-gray-300';
                   return (
                     <div
                       key={s.week_start_date}
                       className="flex-1 flex flex-col justify-end items-center min-w-0 h-full cursor-default"
                       onMouseEnter={() => setHoveredScoreBar(s)}
                       onMouseLeave={() => setHoveredScoreBar(null)}
-                      title={`${s.week_start_date}: ${s.score}`}
+                      title={`${t('dashboard.scoreHistoryHoverLabel')} ${s.week_start_date} → ${s.score}`}
                     >
+                      <span className="text-[10px] font-medium text-gray-600 mb-0.5 leading-none" aria-hidden="true">
+                        {s.score}
+                      </span>
                       <div
-                        className="w-full bg-blue-400 rounded-t min-h-[2px]"
+                        className={`w-full ${barColor} rounded-t min-h-[2px]`}
                         style={{ height: `${Math.max(2, pct)}%` }}
                       />
                     </div>
@@ -229,9 +234,11 @@ export default function DashboardPage() {
           {scoreHistory.length > 0 && (
             <>
               <p className="text-xs text-gray-500 mt-1">{t('dashboard.scoreHistoryCaption')}</p>
+              <p className="text-xs text-gray-600 mt-1">{t('dashboard.scoreHistoryWhatItIs')}</p>
+              <p className="text-xs text-gray-600 mt-0.5">{t('dashboard.scoreHistoryHowToInterpret')}</p>
               {hoveredScoreBar && (
-                <p className="text-xs font-medium text-gray-700 mt-1">
-                  {hoveredScoreBar.week_start_date}: {hoveredScoreBar.score}
+                <p className="text-xs font-medium text-gray-700 mt-2 pt-1 border-t border-gray-100">
+                  {t('dashboard.scoreHistoryHoverLabel')} {hoveredScoreBar.week_start_date} → {hoveredScoreBar.score}
                 </p>
               )}
             </>
@@ -289,14 +296,11 @@ export default function DashboardPage() {
           >
             <div className="flex justify-between items-start">
               <span className="font-medium">{ind.key}</span>
-              <div className="flex flex-col items-end gap-0.5">
-                <span className={statusIconColor(ind.status)} title={t('status.' + ind.status.toLowerCase())} aria-label={t('status.' + ind.status.toLowerCase())}>
-                  <svg className="w-6 h-6" viewBox="0 0 20 20">
-                    <circle cx="10" cy="10" r="8" fill="currentColor" />
-                  </svg>
-                </span>
-                <span className="text-xs text-gray-500">{t('status.' + ind.status.toLowerCase())}</span>
-              </div>
+              <span className={statusIconColor(ind.status)} title={t('status.' + ind.status.toLowerCase())} aria-label={t('status.' + ind.status.toLowerCase())}>
+                <svg className="w-6 h-6" viewBox="0 0 20 20">
+                  <circle cx="10" cy="10" r="8" fill="currentColor" />
+                </svg>
+              </span>
             </div>
             {ind.value != null && (
               <p className="text-lg mt-1">
