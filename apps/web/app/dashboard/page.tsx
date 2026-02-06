@@ -165,9 +165,15 @@ export default function DashboardPage() {
     setRecsLoading(true);
     setAiRecommendations(null);
     try {
-      const { recommendations } = await fetchRecommendations(session.access_token);
-      setAiRecommendations(recommendations || []);
+      const result = await fetchRecommendations(session.access_token);
+      console.log('[recommendations] raw response:', JSON.stringify(result));
+      const recs = result.recommendations || [];
+      setAiRecommendations(recs);
+      if (recs.length === 0) {
+        setRecsError('No recommendations returned. Check Netlify function logs and your LLM API key in Settings.');
+      }
     } catch (e) {
+      console.error('[recommendations] client error:', e);
       setRecsError(e instanceof Error ? e.message : String(e));
     } finally {
       setRecsLoading(false);

@@ -24,9 +24,12 @@ async function getUserIdFromRequest(req: Request): Promise<string | null> {
   const auth = req.headers.authorization;
   const token = typeof auth === 'string' ? auth.replace(/^Bearer\s+/i, '').trim() : '';
   if (!token) return null;
-  const url = process.env.SUPABASE_URL;
-  const anonKey = process.env.SUPABASE_ANON_KEY;
-  if (!url || !anonKey) return null;
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anonKey = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!url || !anonKey) {
+    console.error('[auth] Missing SUPABASE_URL or SUPABASE_ANON_KEY env vars');
+    return null;
+  }
   try {
     const supabase = createClient(url, anonKey);
     const { data: { user }, error } = await supabase.auth.getUser(token);
@@ -39,7 +42,7 @@ async function getUserIdFromRequest(req: Request): Promise<string | null> {
 
 /** Supabase client with service role for reading/writing user_llm_settings (bypasses RLS). */
 function getSupabaseService(): ReturnType<typeof createClient> {
-  const url = process.env.SUPABASE_URL;
+  const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY required');
   return createClient(url, key);
@@ -113,7 +116,21 @@ Respond with a JSON array only, one object per asset, with keys: symbol, action,
   const content = data.choices?.[0]?.message?.content;
   if (!content) throw new Error('OpenAI: empty response');
   const parsed = JSON.parse(content) as Record<string, unknown>;
-  const list = Array.isArray(parsed.recommendations) ? parsed.recommendations : Array.isArray(parsed) ? parsed : [];
+  // OpenAI may wrap the array under different keys; find the first array value
+  let list: unknown[] = [];
+  if (Array.isArray(parsed)) {
+    list = parsed;
+  } else if (typeof parsed === 'object' && parsed !== null) {
+    for (const val of Object.values(parsed)) {
+      if (Array.isArray(val) && val.length > 0) {
+        list = val;
+        break;
+      }
+    }
+  }
+  if (list.length === 0) {
+    console.warn('OpenAI: no array found in response, raw:', content.slice(0, 500));
+  }
   return list as Array<{ symbol: string; action: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning?: string }>;
 }
 
@@ -303,33 +320,44 @@ async function getApp(): Promise<express.Express> {
 
   app.post('/api/recommendations', async (req: Request, res: Response) => {
     try {
+      console.log('[recommendations] handler start');
       const userId = await getUserIdFromRequest(req);
-      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      if (!userId) {
+        console.warn('[recommendations] auth failed – no userId');
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      console.log('[recommendations] userId:', userId);
       const supabase = getSupabaseService();
-      const { data: assets } = await supabase
+      const { data: assets, error: assetsErr } = await supabase
         .from('user_assets')
         .select('symbol, asset_type')
         .eq('user_id', userId);
+      if (assetsErr) console.error('[recommendations] user_assets query error', assetsErr);
       const list = Array.isArray(assets) ? assets : [];
+      console.log('[recommendations] assets count:', list.length, list.map((a) => a.symbol));
       if (list.length === 0) {
         return res.status(400).json({ error: 'Add at least one asset (stock, ETF, commodity, or crypto) in My Assets to generate recommendations.' });
       }
-      const { data: llmRow } = await supabase
+      const { data: llmRow, error: llmErr } = await supabase
         .from('user_llm_settings')
         .select('provider, api_key')
         .eq('user_id', userId)
         .maybeSingle();
+      if (llmErr) console.error('[recommendations] user_llm_settings query error', llmErr);
       if (!llmRow?.api_key) {
+        console.warn('[recommendations] no API key found for user');
         return res.status(400).json({ error: 'Configure your AI provider and API key in Settings first.' });
       }
+      console.log('[recommendations] provider:', llmRow.provider, 'apiKey length:', llmRow.api_key?.length);
       const dashboard = await dashboardService.getToday('UTC');
-      const indSummary = dashboard.indicators.map((i) => `${i.key}: ${i.status} (${i.trend}), value: ${i.value ?? 'n/a'}`).join('\n');
+      const indSummary = dashboard.indicators.map((i: { key: string; status: string; trend: string; value?: number | null }) => `${i.key}: ${i.status} (${i.trend}), value: ${i.value ?? 'n/a'}`).join('\n');
       const dashboardSummary = `Score: ${dashboard.score}, Delta week: ${dashboard.deltaWeek}. Scenario: bull=${dashboard.scenario.bull}, bear=${dashboard.scenario.bear}.\nIndicators:\n${indSummary}`;
       const assetsWithPrices: { symbol: string; asset_type: string; price: number | null }[] = [];
       for (const a of list) {
         const price = await fetchPrice(a.symbol, a.asset_type);
         assetsWithPrices.push({ symbol: a.symbol, asset_type: a.asset_type, price });
       }
+      console.log('[recommendations] assetsWithPrices:', JSON.stringify(assetsWithPrices));
       const provider = (llmRow.provider as string) || 'openai';
       let recommendations: Array<{ symbol: string; action: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning?: string }>;
       if (provider === 'openai') {
@@ -337,9 +365,10 @@ async function getApp(): Promise<express.Express> {
       } else {
         return res.status(400).json({ error: `Provider "${provider}" is not yet supported for recommendations. Use OpenAI in Settings.` });
       }
+      console.log('[recommendations] result count:', recommendations.length);
       return res.json({ recommendations });
     } catch (e) {
-      console.error('/api/recommendations', e);
+      console.error('/api/recommendations error:', e);
       return res.status(500).json({ error: errorMessage(e) });
     }
   });

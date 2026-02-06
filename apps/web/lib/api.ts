@@ -128,7 +128,15 @@ export async function fetchRecommendations(accessToken: string): Promise<{ recom
     body: JSON.stringify({}),
   });
   await throwOnNotOk(res);
-  return res.json();
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text) as { recommendations?: AiRecommendation[]; error?: string };
+    if (json.error) throw new Error(json.error);
+    return { recommendations: json.recommendations || [] };
+  } catch (e) {
+    console.error('[fetchRecommendations] failed to parse response:', text.slice(0, 500));
+    throw e;
+  }
 }
 
 /** One-time backfill: load 90 days of history for all indicators. Uses same secret as run-jobs (CRON_SECRET). */
