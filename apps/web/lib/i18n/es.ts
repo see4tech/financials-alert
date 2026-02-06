@@ -76,7 +76,7 @@ export const es: typeof en = {
     runWithSecret: 'Ejecutar con secret',
     backfillHistory: 'Cargar historial 90 días',
     backfilling: 'Cargando…',
-    backfillSuccess: 'Historial de 90 días cargado. Los gráficos mostrarán el rango completo.',
+    backfillSuccess: 'Historial de 90 días cargado. Los gráficos de indicadores y el historial de puntuación (12 sem) se actualizarán.',
     backfillHint: 'Una vez: descarga datos históricos de los últimos 90 días para todos los indicadores.',
     backfillWithSecret: 'Cargar historial con secret',
     cancel: 'Cancelar',

@@ -74,7 +74,7 @@ export const en = {
     runWithSecret: 'Run with secret',
     backfillHistory: 'Load 90d history',
     backfilling: 'Loading…',
-    backfillSuccess: '90-day history loaded. Charts will show full range.',
+    backfillSuccess: '90-day history loaded. Indicator charts and the 12-week score history will update.',
     backfillHint: 'One-time: fetch historical data for the last 90 days for all indicators.',
     backfillWithSecret: 'Load history with secret',
     cancel: 'Cancel',

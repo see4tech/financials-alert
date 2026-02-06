@@ -1,4 +1,4 @@
-export { MoreThanOrEqual, IsNull } from 'typeorm';
+export { MoreThanOrEqual, LessThanOrEqual, IsNull } from 'typeorm';
 export { getDataSource, ensureDataSource, getDb } from './data-source';
 export type { Db } from './data-source';
 export type { Repo, RepoWithInsert, FindManyOptions, FindOneOptions } from './db-types';

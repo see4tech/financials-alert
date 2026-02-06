@@ -35,11 +35,17 @@ function applyWhere(sb: any, where?: Where): any {
   for (const [key, value] of Object.entries(safe)) {
     if (value === undefined) continue;
     if (String(value) === 'undefined') continue;
-    // TypeORM FindOperator: MoreThanOrEqual etc. have .value at runtime
-    if (value !== null && typeof value === 'object' && 'value' in value) {
-      const v = (value as { value: unknown }).value;
-      if (v instanceof Date) q = q.gte(key, v.toISOString());
-      else q = q.gte(key, v);
+    // TypeORM FindOperator: MoreThanOrEqual / LessThanOrEqual use ._value and ._type at runtime
+    const opVal = value !== null && typeof value === 'object' ? (value as { value?: unknown; _value?: unknown; _type?: string; type?: string }) : null;
+    const val = opVal && ('_value' in opVal || 'value' in opVal) ? (opVal._value ?? opVal.value) : null;
+    if (val !== null && val !== undefined) {
+      const iso = val instanceof Date ? val.toISOString() : val;
+      const opType = opVal!._type ?? opVal!.type ?? '';
+      if (opType === 'lessThanOrEqual') {
+        q = q.lte(key, iso);
+      } else {
+        q = q.gte(key, iso);
+      }
       continue;
     }
     // TypeORM IsNull() - FindOperator with _type (or any object that shouldn't be sent as a value)

@@ -212,9 +212,10 @@ export default function DashboardPage() {
   }
   if (!data) return null;
 
-  const statusIconColor = (s: string) =>
+  const statusIconColor = (s: string): string =>
     s === 'GREEN' ? 'text-green-600' : s === 'RED' ? 'text-red-600' : s === 'YELLOW' ? 'text-amber-500' : 'text-gray-400';
-  const trendArrow = (trend: string) => (trend === 'RISING' ? '↑' : trend === 'FALLING' ? '↓' : '→');
+  const trendArrow = (trend: string): string =>
+    trend === 'RISING' ? '↑' : trend === 'FALLING' ? '↓' : '→';
 
   return (
     <main className="min-h-screen p-8 max-w-6xl mx-auto">

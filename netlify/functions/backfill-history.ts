@@ -1,6 +1,7 @@
 import {
   getDb,
   RegistryService,
+  StatusEngine,
   FredAdapter,
   CoinGeckoAdapter,
   BinanceAdapter,
@@ -8,6 +9,10 @@ import {
   TwelveDataAdapter,
   type ProviderAdapter,
   MoreThanOrEqual,
+  LessThanOrEqual,
+  IsNull,
+  linearRegressionSlope,
+  average,
 } from '@market-health/api-core';
 import type { Handler, HandlerEvent, HandlerContext } from '@netlify/functions';
 
@@ -37,6 +42,8 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
   const db = await getDb();
   const rawRepo = db.getRawRepo();
   const pointsRepo = db.getPointsRepo();
+  const derivedRepo = db.getDerivedRepo();
+  const scoreRepo = db.getScoreRepo();
   const registry = new RegistryService();
   const adapters: ProviderAdapter[] = [
     new FredAdapter(),
@@ -123,15 +130,161 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     console.log('Backfill: aggregated', indicatorKey, '->', pointRows.length, 'points');
   }
 
+  // Derived metrics (ma_21d, slope, etc.) for the backfill range so we can compute historical weekly scores
+  const derivedSince = new Date(Date.now() - 95 * 24 * 60 * 60 * 1000);
+  for (const indicatorKey of aggregateKeys) {
+    const config =
+      registry.getByKey(indicatorKey) ||
+      (indicatorKey.startsWith('eq.leaders.') ? registry.getByKey('eq.leaders') : undefined);
+    const trendWindow = config?.trend_window_days ?? 21;
+    const points = await pointsRepo.find({
+      where: { indicator_key: indicatorKey, ts: MoreThanOrEqual(derivedSince), granularity: '1d' },
+      order: { ts: 'ASC' },
+      take: 200,
+    });
+    if (points.length < 2) continue;
+    const values = points.map((p) => ({ ts: (p as { ts: Date }).ts, value: Number((p as { value: unknown }).value) }));
+    for (let i = trendWindow; i < values.length; i++) {
+      const window = values.slice(i - trendWindow, i);
+      const vals = window.map((v) => v.value);
+      const slope21 = linearRegressionSlope(vals);
+      const slope14 = window.length >= 14 ? linearRegressionSlope(vals.slice(-14)) : slope21;
+      const ma21 = average(vals);
+      const v0 = values[i].value;
+      const v1d = i >= 1 ? values[i - 1].value : v0;
+      const v7d = i >= 7 ? values[i - 7].value : v0;
+      const v14d = i >= 14 ? values[i - 14].value : v0;
+      const v21d = i >= 21 ? values[i - 21].value : v0;
+      await derivedRepo.insertOrIgnore([
+        {
+          id: crypto.randomUUID(),
+          ts: values[i].ts,
+          indicator_key: indicatorKey,
+          pct_1d: v1d !== 0 ? ((v0 - v1d) / v1d) * 100 : 0,
+          pct_7d: v7d !== 0 ? ((v0 - v7d) / v7d) * 100 : 0,
+          pct_14d: v14d !== 0 ? ((v0 - v14d) / v14d) * 100 : 0,
+          pct_21d: v21d !== 0 ? ((v0 - v21d) / v21d) * 100 : 0,
+          slope_14d: slope14,
+          slope_21d: slope21,
+          ma_21d: ma21,
+        },
+      ]);
+    }
+    console.log('Backfill: derived for', indicatorKey);
+  }
+
+  // Weekly scores for last 12 weeks so "Historial (12 sem)" shows data
+  const statusEngine = new StatusEngine(registry);
+  const coreKeys = registry.getCoreKeys().filter((k) => registry.getByKey(k)?.enabled);
+  const mondays: string[] = [];
+  for (let w = 0; w < 12; w++) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - 7 * w);
+    const day = d.getUTCDay();
+    const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+    const monday = new Date(d);
+    monday.setUTCDate(diff);
+    mondays.push(monday.toISOString().slice(0, 10));
+  }
+  const stalenessMs = 365 * 24 * 3600 * 1000; // 1 year so historical data is never "stale"
+  let weeksInserted = 0;
+  for (const weekStart of mondays) {
+    const endOfWeek = new Date(weekStart + 'T23:59:59.999Z');
+    endOfWeek.setUTCDate(endOfWeek.getUTCDate() + 6); // Sunday
+    let scoreCount = 0;
+
+    for (const key of coreKeys) {
+      if (key === 'eq.leaders') {
+        const tickers = ['NVDA', 'MSFT', 'AAPL', 'GOOGL'];
+        let green = 0;
+        let red = 0;
+        for (const sym of tickers) {
+          const k = `eq.leaders.${sym}`;
+          const pts = await pointsRepo.find({
+            where: { indicator_key: k, ts: LessThanOrEqual(endOfWeek), granularity: '1d' },
+            order: { ts: 'DESC' },
+            take: 25,
+          });
+          if (pts.length < 5) continue;
+          const ptsAsc = (pts as { ts: Date; value: unknown }[]).slice().reverse();
+          const derivedRow = await derivedRepo.findOne({
+            where: { indicator_key: k, ts: LessThanOrEqual(endOfWeek) },
+            order: { ts: 'DESC' },
+          });
+          const result = statusEngine.compute(
+            'eq.nasdaq',
+            ptsAsc.map((p) => ({ ts: p.ts, value: Number(p.value) })),
+            {
+              slope: derivedRow?.slope_21d != null ? Number((derivedRow as { slope_21d?: number }).slope_21d) : undefined,
+              ma_21d: derivedRow?.ma_21d != null ? Number((derivedRow as { ma_21d?: number }).ma_21d) : undefined,
+            },
+            stalenessMs,
+            ptsAsc[ptsAsc.length - 1].ts,
+          );
+          if (result.status === 'GREEN') green++;
+          if (result.status === 'RED') red++;
+        }
+        const status = green >= 3 ? 'GREEN' : green === 2 ? 'YELLOW' : red >= 2 ? 'RED' : 'YELLOW';
+        if (status === 'GREEN') scoreCount++;
+        continue;
+      }
+      const config = registry.getByKey(key);
+      if (!config) continue;
+      const points = await pointsRepo.find({
+        where: { indicator_key: key, ts: LessThanOrEqual(endOfWeek), granularity: '1d' },
+        order: { ts: 'DESC' },
+        take: 50,
+      });
+      if (points.length < 2) continue;
+      const pointsAsc = (points as { ts: Date; value: unknown }[]).slice().reverse();
+      const derivedRow = await derivedRepo.findOne({
+        where: { indicator_key: key, ts: LessThanOrEqual(endOfWeek) },
+        order: { ts: 'DESC' },
+      });
+      const result = statusEngine.compute(
+        key,
+        pointsAsc.map((p) => ({ ts: p.ts, value: Number(p.value) })),
+        {
+          slope: derivedRow?.slope_21d != null ? Number((derivedRow as { slope_21d?: number }).slope_21d) : undefined,
+          ma_21d: derivedRow?.ma_21d != null ? Number((derivedRow as { ma_21d?: number }).ma_21d) : undefined,
+        },
+        stalenessMs,
+        pointsAsc[pointsAsc.length - 1].ts,
+      );
+      if (result.status === 'GREEN') scoreCount++;
+    }
+
+    const existing = await scoreRepo.findOne({ where: { week_start_date: weekStart, user_id: IsNull() } });
+    if (!existing) {
+      const prevWeekStart = (() => {
+        const d = new Date(weekStart);
+        d.setUTCDate(d.getUTCDate() - 7);
+        return d.toISOString().slice(0, 10);
+      })();
+      const prevScore = await scoreRepo.findOne({ where: { week_start_date: prevWeekStart, user_id: IsNull() } });
+      const delta = prevScore ? scoreCount - Number((prevScore as { score: number }).score) : 0;
+      await scoreRepo.save({
+        week_start_date: weekStart,
+        user_id: null,
+        score: scoreCount,
+        delta_score: delta,
+        notes: null,
+      });
+      weeksInserted++;
+      console.log('Backfill: weekly score', weekStart, '->', scoreCount);
+    }
+  }
+
   return {
     statusCode: 200,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       ok: true,
-      message: 'Backfill completed. Historical data (90d) loaded for all indicators.',
+      message: 'Backfill completed. Historical data (90d) loaded for all indicators. Weekly score history (12w) backfilled.',
       from: fromStr,
       to: toStr,
       results,
+      weeklyScoresInserted: weeksInserted,
     }),
   };
 };
