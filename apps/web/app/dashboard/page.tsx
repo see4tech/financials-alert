@@ -7,12 +7,14 @@ import { useLocale } from '@/app/context/LocaleContext';
 import { fetchDashboard, fetchScoreHistory, triggerRunJobs } from '@/lib/api';
 
 type Indicator = { key: string; value?: number; trend: string; status: string; explain?: string };
+type Recommendation = { id: string; tickers?: string[] };
 type Dashboard = {
   asOf: string;
   score: number;
   deltaWeek: number;
   indicators: Indicator[];
   scenario: { bull: string; bear: string };
+  recommendations?: Recommendation[];
 };
 
 function refreshData(): Promise<[Dashboard, { data: { week_start_date: string; score: number }[] }]> {
@@ -242,6 +244,37 @@ export default function DashboardPage() {
         </div>
       </section>
 
+      <h2 className="text-xl font-semibold mb-4">{t('dashboard.recommendationsTitle')}</h2>
+      {(!data.recommendations || data.recommendations.length === 0) ? (
+        <p className="text-sm text-gray-500 mb-6">{t('dashboard.recommendationsEmpty')}</p>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+          {data.recommendations.map((rec) => {
+            const labelKey = 'dashboard.recommendations.' + rec.id;
+            const descKey = 'dashboard.recommendations.' + rec.id + '_desc';
+            const desc = t(descKey) !== descKey ? t(descKey) : null;
+            return (
+              <div key={rec.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                <p className="font-medium text-gray-900">{t(labelKey)}</p>
+                {desc && <p className="text-xs text-gray-600 mt-1">{desc}</p>}
+                {rec.tickers && rec.tickers.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {rec.tickers.map((ticker) => (
+                      <span
+                        key={ticker}
+                        className="inline-flex items-center rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700"
+                      >
+                        {ticker}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
       <h2 className="text-xl font-semibold mb-4">{t('dashboard.indicators')}</h2>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {data.indicators.map((ind) => {
@@ -256,11 +289,14 @@ export default function DashboardPage() {
           >
             <div className="flex justify-between items-start">
               <span className="font-medium">{ind.key}</span>
-              <span className={statusIconColor(ind.status)} title={t('status.' + ind.status.toLowerCase())} aria-label={t('status.' + ind.status.toLowerCase())}>
-                <svg className="w-6 h-6" viewBox="0 0 20 20">
-                  <circle cx="10" cy="10" r="8" fill="currentColor" />
-                </svg>
-              </span>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className={statusIconColor(ind.status)} title={t('status.' + ind.status.toLowerCase())} aria-label={t('status.' + ind.status.toLowerCase())}>
+                  <svg className="w-6 h-6" viewBox="0 0 20 20">
+                    <circle cx="10" cy="10" r="8" fill="currentColor" />
+                  </svg>
+                </span>
+                <span className="text-xs text-gray-500">{t('status.' + ind.status.toLowerCase())}</span>
+              </div>
             </div>
             {ind.value != null && <p className="text-lg mt-1">{ind.value}</p>}
             <p className="text-sm text-gray-600 mt-1">{trendArrow(ind.trend)} {t('trend.' + ind.trend.toLowerCase())}</p>
@@ -269,7 +305,10 @@ export default function DashboardPage() {
               <p className="text-xs text-amber-600 mt-1">{t('dashboard.staleHint')}</p>
             )}
             {t('dashboard.favorable.' + ind.key) !== 'dashboard.favorable.' + ind.key && (
-              <p className="text-xs text-gray-600 mt-2 pt-2 border-t border-gray-100">{t('dashboard.favorable.' + ind.key)}</p>
+              <p className="text-xs text-gray-600 mt-2 pt-2 border-t border-gray-100">
+                <span className="font-medium text-gray-700">{t('dashboard.favorableLabel')}</span>{' '}
+                {t('dashboard.favorable.' + ind.key)}
+              </p>
             )}
             {hoveredCard === ind.key && tooltipText && (
               <div className="absolute z-20 left-0 right-0 bottom-full mb-1 p-3 text-xs text-left bg-gray-800 text-white rounded-lg shadow-lg pointer-events-none">

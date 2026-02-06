@@ -42,18 +42,19 @@ export const es: typeof en = {
     runWithSecret: 'Ejecutar con secret',
     cancel: 'Cancelar',
     errorHint: 'Puedes ejecutar el job de datos para rellenar la base de datos y luego actualizar.',
+    favorableLabel: 'Qué se considera favorable:',
     favorable: {
       'macro.us10y':
-        'Escenario favorable: rendimiento estable o a la baja; sin nuevos máximos de 2–4 semanas.',
-      'macro.dxy': 'Escenario favorable: DXY a la baja (dólar más débil).',
+        'Rendimiento estable o a la baja; sin nuevos máximos de 2–4 semanas.',
+      'macro.dxy': 'DXY a la baja (dólar más débil).',
       'eq.nasdaq':
-        'Escenario favorable: precio por encima de la media 21 días y tendencia no bajista.',
+        'Precio por encima de la media 21 días y tendencia no bajista.',
       'eq.leaders':
-        'Escenario favorable: mayoría de líderes en verde (3+ de 4).',
+        'Mayoría de líderes en verde (3+ de 4).',
       'crypto.btc':
-        'Escenario favorable: BTC mantiene $60k–$64k con tendencia alcista o cierra por encima de $75k.',
+        'BTC mantiene $60k–$64k con tendencia alcista o cierra por encima de $75k.',
       'sent.fng':
-        'Escenario favorable: miedo alto (≤25) que mejora, o zona neutral (26–60).',
+        'Miedo alto (≤25) que mejora, o zona neutral (26–60).',
     },
     indicatorTooltip: {
       'macro.us10y':
@@ -80,6 +81,26 @@ export const es: typeof en = {
         moderate: 'moderado',
         low: 'bajo',
       },
+    },
+    recommendationsTitle: 'Recomendaciones',
+    recommendationsEmpty: 'Sin recomendaciones específicas para el estado actual.',
+    recommendations: {
+      buy_etf: 'Considera añadir ETFs de equity',
+      buy_etf_desc: 'Escenario alcista y puntuación sana apoyan exposición al riesgo.',
+      buy_stocks: 'Considera mega-caps',
+      buy_stocks_desc: 'Líderes y Nasdaq en buena forma.',
+      hold_equity: 'Mantén posiciones de equity',
+      hold_equity_desc: 'Entorno mixto o moderado; evita movimientos grandes.',
+      reduce_equity: 'Considera reducir exposición a equity',
+      reduce_equity_desc: 'Riesgo bajista elevado o puntuación baja.',
+      buy_crypto: 'Considera añadir crypto',
+      buy_crypto_desc: 'BTC y sentimiento favorables.',
+      hold_crypto: 'Mantén posiciones en crypto',
+      hold_crypto_desc: 'BTC en zona de precaución.',
+      reduce_crypto: 'Considera reducir exposición a crypto',
+      reduce_crypto_desc: 'BTC en zona de riesgo.',
+      sell_risk: 'Considera vender activos de riesgo',
+      sell_risk_desc: 'Bajista elevado y puntuación baja.',
     },
   },
   trend: {

@@ -55,6 +55,7 @@ export class DashboardService {
 
     const bull = this.scenarioBull(indicators);
     const bear = this.scenarioBear(indicators);
+    const recommendations = this.getRecommendations(indicators, score, { bull, bear });
 
     return {
       asOf: asOf.toISOString(),
@@ -62,7 +63,63 @@ export class DashboardService {
       deltaWeek,
       indicators,
       scenario: { bull, bear },
+      recommendations,
     };
+  }
+
+  getRecommendations(
+    indicators: { key: string; status: string }[],
+    score: number,
+    scenario: { bull: string; bear: string },
+  ): { id: string; tickers?: string[] }[] {
+    const m = new Map(indicators.map((i) => [i.key, i.status]));
+    const out: { id: string; tickers?: string[] }[] = [];
+
+    // buy_etf: bull strengthening/mixed and score >= 4
+    if ((scenario.bull === 'strengthening' || scenario.bull === 'mixed') && score >= 4) {
+      out.push({ id: 'buy_etf', tickers: ['QQQ', 'SPY'] });
+    }
+
+    // buy_stocks: eq.leaders GREEN and (eq.nasdaq GREEN or YELLOW)
+    const leadersOk = m.get('eq.leaders') === 'GREEN';
+    const nasdaqOk = m.get('eq.nasdaq') === 'GREEN' || m.get('eq.nasdaq') === 'YELLOW';
+    if (leadersOk && nasdaqOk) {
+      out.push({ id: 'buy_stocks', tickers: ['NVDA', 'MSFT', 'AAPL', 'GOOGL'] });
+    }
+
+    // hold_equity: bull mixed or bear moderate, score 3–5
+    if ((scenario.bull === 'mixed' || scenario.bear === 'moderate') && score >= 3 && score <= 5) {
+      out.push({ id: 'hold_equity' });
+    }
+
+    // reduce_equity: bear elevated or score <= 2
+    if (scenario.bear === 'elevated' || score <= 2) {
+      out.push({ id: 'reduce_equity' });
+    }
+
+    // buy_crypto: crypto.btc GREEN and (sent.fng favorable or neutral – treat GREEN/YELLOW as ok)
+    const btcGreen = m.get('crypto.btc') === 'GREEN';
+    const fngOk = m.get('sent.fng') === 'GREEN' || m.get('sent.fng') === 'YELLOW';
+    if (btcGreen && fngOk) {
+      out.push({ id: 'buy_crypto', tickers: ['BTC'] });
+    }
+
+    // hold_crypto: crypto.btc YELLOW
+    if (m.get('crypto.btc') === 'YELLOW') {
+      out.push({ id: 'hold_crypto' });
+    }
+
+    // reduce_crypto: crypto.btc RED
+    if (m.get('crypto.btc') === 'RED') {
+      out.push({ id: 'reduce_crypto' });
+    }
+
+    // sell_risk: bear elevated and score <= 2
+    if (scenario.bear === 'elevated' && score <= 2) {
+      out.push({ id: 'sell_risk' });
+    }
+
+    return out;
   }
 
   private weekStart(d: Date): string {

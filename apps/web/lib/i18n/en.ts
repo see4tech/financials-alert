@@ -40,17 +40,18 @@ export const en = {
     runWithSecret: 'Run with secret',
     cancel: 'Cancel',
     errorHint: 'You can try running the data job to populate the database, then refresh.',
+    favorableLabel: "What's considered favorable:",
     favorable: {
       'macro.us10y':
-        'Favorable scenario: yield stable or falling; no new 2–4 week highs.',
-      'macro.dxy': 'Favorable scenario: DXY falling (weaker dollar).',
+        'Yield stable or falling; no new 2–4 week highs.',
+      'macro.dxy': 'DXY falling (weaker dollar).',
       'eq.nasdaq':
-        'Favorable scenario: price above 21-day average and trend not falling.',
-      'eq.leaders': 'Favorable scenario: majority of leaders green (3+ of 4).',
+        'Price above 21-day average and trend not falling.',
+      'eq.leaders': 'Majority of leaders green (3+ of 4).',
       'crypto.btc':
-        'Favorable scenario: BTC holds $60k–$64k with rising trend or closes above $75k.',
+        'BTC holds $60k–$64k with rising trend or closes above $75k.',
       'sent.fng':
-        'Favorable scenario: high fear (≤25) improving, or neutral zone (26–60).',
+        'High fear (≤25) improving, or neutral zone (26–60).',
     },
     indicatorTooltip: {
       'macro.us10y':
@@ -77,6 +78,26 @@ export const en = {
         moderate: 'moderate',
         low: 'low',
       },
+    },
+    recommendationsTitle: 'Recommendations',
+    recommendationsEmpty: 'No specific recommendations for the current state.',
+    recommendations: {
+      buy_etf: 'Consider adding equity ETFs',
+      buy_etf_desc: 'Bull scenario and healthy score support risk-on allocation.',
+      buy_stocks: 'Consider mega-cap stocks',
+      buy_stocks_desc: 'Leaders and Nasdaq in good shape.',
+      hold_equity: 'Hold current equity positions',
+      hold_equity_desc: 'Mixed or moderate environment; avoid big moves.',
+      reduce_equity: 'Consider reducing equity exposure',
+      reduce_equity_desc: 'Bear risk elevated or low score.',
+      buy_crypto: 'Consider adding crypto',
+      buy_crypto_desc: 'BTC and sentiment supportive.',
+      hold_crypto: 'Hold crypto positions',
+      hold_crypto_desc: 'BTC in caution zone.',
+      reduce_crypto: 'Consider reducing crypto exposure',
+      reduce_crypto_desc: 'BTC in risk zone.',
+      sell_risk: 'Consider selling risk assets',
+      sell_risk_desc: 'Bear elevated and low score.',
     },
   },
   trend: {
