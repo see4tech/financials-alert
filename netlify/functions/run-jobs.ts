@@ -275,19 +275,25 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
     where: { week_start_date: prevWeekStart, user_id: IsNull() },
   });
   const delta = prevScore ? score - prevScore.score : 0;
-  const existing = await scoreRepo.findOne({ where: { week_start_date: weekStart, user_id: IsNull() } });
-  if (existing) {
-    existing.score = score;
-    existing.delta_score = delta;
-    await scoreRepo.save(existing);
-  } else {
-    await scoreRepo.save({
-      week_start_date: weekStart,
-      user_id: null,
-      score,
-      delta_score: delta,
-      notes: null,
-    });
+  try {
+    const existing = await scoreRepo.findOne({ where: { week_start_date: weekStart, user_id: IsNull() } });
+    if (existing) {
+      (existing as Record<string, unknown>).score = score;
+      (existing as Record<string, unknown>).delta_score = delta;
+      await scoreRepo.save(existing);
+      console.log('Score updated:', weekStart, 'score=', score);
+    } else {
+      await scoreRepo.save({
+        week_start_date: weekStart,
+        user_id: null,
+        score,
+        delta_score: delta,
+        notes: null,
+      });
+      console.log('Score inserted:', weekStart, 'score=', score);
+    }
+  } catch (e) {
+    console.error('Score save failed:', weekStart, score, e);
   }
 
   // 5. Rules

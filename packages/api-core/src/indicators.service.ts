@@ -20,28 +20,19 @@ export class IndicatorsService {
   }
 
   async getScoreHistory(range: string) {
+    // Fetch last 52 rows without date filter so we always get data regardless of DB date handling
+    const all: unknown[] = await this.scoresRepo.find({
+      order: { week_start_date: 'DESC' },
+      take: 52,
+    });
     const since = this.parseRange(range);
     const sinceStr = since.toISOString().slice(0, 10);
-    let all: unknown[] = [];
-    try {
-      all = await this.scoresRepo.find({
-        where: { week_start_date: MoreThan(sinceStr) },
-        order: { week_start_date: 'DESC' },
-        take: 52,
-      });
-    } catch {
-      // Fallback: fetch last 52 rows without date filter (e.g. if MoreThan fails in some DB drivers)
-      all = await this.scoresRepo.find({
-        order: { week_start_date: 'DESC' },
-        take: 52,
-      });
-    }
-    // One row per week (latest score per week in case of duplicates)
     const byWeek = new Map<string, { week_start_date: string; score: number }>();
     for (const row of all) {
       const r = row as { week_start_date?: string; score?: number };
       const w = r.week_start_date != null ? String(r.week_start_date).slice(0, 10) : '';
       if (!w) continue;
+      if (w < sinceStr) continue;
       if (!byWeek.has(w)) byWeek.set(w, { week_start_date: w, score: Number(r.score) ?? 0 });
     }
     const sorted = Array.from(byWeek.values()).sort((a, b) => a.week_start_date.localeCompare(b.week_start_date));
