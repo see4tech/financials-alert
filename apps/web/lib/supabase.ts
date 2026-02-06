@@ -30,12 +30,12 @@ export function getSupabaseBrowser(): SupabaseClient | null {
 }
 
 /**
- * Load Supabase config from /api/config (uses Netlify SUPABASE_URL, SUPABASE_ANON_KEY) and set the browser client.
+ * Load Supabase config from /api/config (uses Netlify SUPABASE_URL, SUPABASE_ANON_KEY).
+ * Used when client-side env vars are not available (e.g. only SUPABASE_* in Netlify, no NEXT_PUBLIC_*).
  */
 export async function initSupabaseBrowserFromConfig(): Promise<SupabaseClient | null> {
   if (typeof window === 'undefined') return null;
   if (browserClient) return browserClient;
-  if (envMissing === true) return null;
   try {
     const res = await fetch('/api/config');
     const data = (await res.json()) as { supabaseUrl?: string | null; supabaseAnonKey?: string | null };
@@ -45,8 +45,9 @@ export async function initSupabaseBrowserFromConfig(): Promise<SupabaseClient | 
       envMissing = true;
       return null;
     }
-  browserClient = createClient(url, key);
-  return browserClient;
+    envMissing = false;
+    browserClient = createClient(url, key);
+    return browserClient;
   } catch {
     envMissing = true;
     return null;
