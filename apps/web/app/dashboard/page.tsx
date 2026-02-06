@@ -124,6 +124,7 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-2xl font-bold">{t('dashboard.title')}</h1>
           <p className="text-sm text-gray-500 mt-1">{t('dashboard.asOf')}: {new Date(data.asOf).toLocaleString()}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{t('dashboard.refreshHint')}</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -177,8 +178,42 @@ export default function DashboardPage() {
           <h2 className="text-sm font-medium text-gray-500">{t('dashboard.weeklyScore')}</h2>
           <p className="text-3xl font-bold">{data.score}</p>
           <p className="text-sm text-gray-600">{t('dashboard.deltaWeek')}: {data.deltaWeek >= 0 ? '+' : ''}{data.deltaWeek}</p>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs font-medium text-gray-500 mb-1.5">{t('dashboard.weeklyScoreBreakdown')}</p>
+            <p className="text-[11px] text-gray-500 mb-2">{t('dashboard.weeklyScoreBreakdownHint')}</p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+              {(['GREEN', 'YELLOW', 'RED'] as const).map((status) => {
+                const list = data.indicators.filter((i) => i.status === status);
+                if (list.length === 0) return null;
+                const statusKey = status === 'GREEN' ? 'scoreStatusGreen' : status === 'YELLOW' ? 'scoreStatusYellow' : 'scoreStatusRed';
+                const labels = list.map((i) => {
+                  const key = 'dashboard.indicatorShortLabel.' + i.key;
+                  const label = t(key);
+                  return label !== key ? label : i.key;
+                });
+                return (
+                  <span key={status} className="flex items-center gap-1">
+                    <span className={`font-medium ${statusIconColor(status)}`}>{t('dashboard.' + statusKey)}</span>
+                    <span className="text-gray-600">({list.length}): {labels.join(', ')}</span>
+                  </span>
+                );
+              })}
+              {data.indicators.some((i) => i.status !== 'GREEN' && i.status !== 'YELLOW' && i.status !== 'RED') && (
+                <span className="flex items-center gap-1">
+                  <span className="font-medium text-gray-400">{t('dashboard.scoreStatusUnknown')}</span>
+                  <span className="text-gray-600">
+                    ({data.indicators.filter((i) => i.status !== 'GREEN' && i.status !== 'YELLOW' && i.status !== 'RED').length}):{' '}
+                    {data.indicators
+                      .filter((i) => i.status !== 'GREEN' && i.status !== 'YELLOW' && i.status !== 'RED')
+                      .map((i) => (t('dashboard.indicatorShortLabel.' + i.key) !== 'dashboard.indicatorShortLabel.' + i.key ? t('dashboard.indicatorShortLabel.' + i.key) : i.key))
+                      .join(', ')}
+                  </span>
+                </span>
+              )}
+            </div>
+          </div>
           {hoveredSummaryCard === 'weeklyScore' && (
-            <div className="absolute z-20 left-0 right-0 bottom-full mb-1 p-3 text-xs text-left bg-gray-800 text-white rounded-lg shadow-lg pointer-events-none">
+            <div className="absolute z-20 left-0 right-0 bottom-full mb-1 p-3 text-xs text-left bg-gray-800 text-white rounded-lg shadow-lg pointer-events-none max-w-xs">
               {t('dashboard.weeklyScoreTooltip')}
             </div>
           )}
