@@ -30,12 +30,12 @@ export function NavBar() {
   }, [clientReady]);
 
   async function handleLogout() {
+    setSession(false);
     const client = getSupabaseBrowser();
     if (client) {
       await client.auth.signOut();
     }
     router.push('/login');
-    router.refresh();
   }
 
   return (

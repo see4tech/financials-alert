@@ -21,8 +21,14 @@ export default function LoginPage() {
 
   useEffect(() => {
     if (!clientReady) return;
-    setAuthConfigured(!!getSupabaseBrowser());
-  }, [clientReady]);
+    const client = getSupabaseBrowser();
+    setAuthConfigured(client !== null);
+    if (client) {
+      client.auth.getSession().then(({ data: { session } }) => {
+        if (session) router.replace('/dashboard');
+      });
+    }
+  }, [clientReady, router]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,7 +51,7 @@ export default function LoginPage() {
     }
   }
 
-  if (authConfigured === false) {
+  if (clientReady && authConfigured === false) {
     return (
       <main className="min-h-screen p-8 bg-gray-50">
         <div className="max-w-4xl mx-auto mb-6">
