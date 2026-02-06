@@ -13,6 +13,9 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
+  "optionalDependencies": {
+    "@next/swc-linux-x64-gnu": "14.2.0"
+  },
   "devDependencies": {
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.0",
