@@ -190,8 +190,10 @@ export default function DashboardPage() {
         >
           <h2 className="text-sm font-medium text-gray-500">{t('dashboard.scoreHistory')}</h2>
           {hoveredSummaryCard === 'scoreHistory' && (
-            <div className="absolute z-20 left-0 right-0 bottom-full mb-1 p-3 text-xs text-left bg-gray-800 text-white rounded-lg shadow-lg pointer-events-none">
-              {t('dashboard.scoreHistoryTooltip')}
+            <div className="absolute z-20 left-0 right-0 bottom-full mb-1 p-3 text-xs text-left bg-gray-800 text-white rounded-lg shadow-lg pointer-events-none max-w-sm">
+              <p className="mb-1">{t('dashboard.scoreHistoryCaption')}</p>
+              <p className="mb-1">{t('dashboard.scoreHistoryWhatItIs')}</p>
+              <p>{t('dashboard.scoreHistoryHowToInterpret')}</p>
             </div>
           )}
           {scoreHistory.length === 0 ? (
@@ -231,17 +233,10 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-          {scoreHistory.length > 0 && (
-            <>
-              <p className="text-xs text-gray-500 mt-1">{t('dashboard.scoreHistoryCaption')}</p>
-              <p className="text-xs text-gray-600 mt-1">{t('dashboard.scoreHistoryWhatItIs')}</p>
-              <p className="text-xs text-gray-600 mt-0.5">{t('dashboard.scoreHistoryHowToInterpret')}</p>
-              {hoveredScoreBar && (
-                <p className="text-xs font-medium text-gray-700 mt-2 pt-1 border-t border-gray-100">
-                  {t('dashboard.scoreHistoryHoverLabel')} {hoveredScoreBar.week_start_date} → {hoveredScoreBar.score}
-                </p>
-              )}
-            </>
+          {scoreHistory.length > 0 && hoveredScoreBar && (
+            <p className="text-xs font-medium text-gray-700 mt-2">
+              {t('dashboard.scoreHistoryHoverLabel')} {hoveredScoreBar.week_start_date} → {hoveredScoreBar.score}
+            </p>
           )}
         </div>
         <div className="border rounded-lg p-4 bg-white shadow-sm">
