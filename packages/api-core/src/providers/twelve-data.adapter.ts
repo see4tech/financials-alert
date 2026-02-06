@@ -28,8 +28,22 @@ export class TwelveDataAdapter implements ProviderAdapter {
       if (res.status === 429) throw new Error('Twelve Data rate limit');
       throw new Error(`Twelve Data ${res.status}`);
     }
-    const data = (await res.json()) as { values?: Array<{ datetime: string; close: string }> };
+    const data = (await res.json()) as {
+      values?: Array<{ datetime: string; close: string }>;
+      code?: number;
+      message?: string;
+      status?: string;
+    };
     const values = data.values || [];
+    if (values.length === 0) {
+      console.warn(
+        'Twelve Data API returned 0 values for',
+        indicatorKey,
+        'symbol=' + symbol,
+        data.code != null ? 'code=' + data.code : '',
+        data.message ?? data.status ?? '',
+      );
+    }
     return values.map((v) => ({
       indicatorKey,
       ts: `${v.datetime}T20:00:00.000Z`,
