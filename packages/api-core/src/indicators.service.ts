@@ -19,7 +19,27 @@ export class IndicatorsService {
       order: { ts: 'ASC' },
       take: 500,
     });
-    return { key, granularity: '1d', data: points };
+    const onePerDay = this.aggregateToOnePerDay(points);
+    return { key, granularity: '1d', data: onePerDay };
+  }
+
+  /** Ensures at most one point per calendar day (keeps latest value per day). */
+  private aggregateToOnePerDay(
+    points: Array<{ ts: Date | string; value: unknown }>,
+  ): Array<{ ts: string; value: number }> {
+    const byDay = new Map<string, { ts: string; value: number }>();
+    for (const p of points) {
+      const ts = p.ts instanceof Date ? p.ts : new Date(p.ts);
+      const day = ts.toISOString().slice(0, 10);
+      const value = Number(p.value);
+      const existing = byDay.get(day);
+      if (!existing || ts >= new Date(existing.ts)) {
+        byDay.set(day, { ts: `${day}T12:00:00.000Z`, value });
+      }
+    }
+    return Array.from(byDay.entries())
+      .map(([, v]) => v)
+      .sort((a, b) => a.ts.localeCompare(b.ts));
   }
 
   private async getHistoryEqLeaders(since: Date): Promise<{ key: string; granularity: string; data: Array<{ ts: string; value: number }> }> {
