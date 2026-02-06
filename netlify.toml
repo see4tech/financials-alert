@@ -1,6 +1,6 @@
 [build]
   base = ""
-  command = "npm install && npm run build:api-core && npm run build:web"
+  command = "npm install && npm install @next/swc-linux-x64-gnu@14.2.0 --no-save && npm run build:api-core && npm run build:web"
   publish = "apps/web/out"
   functions = "netlify/functions"
 
