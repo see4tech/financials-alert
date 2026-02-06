@@ -6,11 +6,14 @@ export class TwelveDataAdapter implements ProviderAdapter {
   name = 'Twelve Data';
   supports = ['macro.dxy', 'eq.nasdaq', 'eq.leaders'];
 
-  private symbolMap: Record<string, string> = {
-    'macro.dxy': 'DX-Y.NYB',
-    'eq.nasdaq': 'IXIC',
-    'eq.leaders': '',
-  };
+  /** Default symbols. Override with TWELVE_DATA_DXY_SYMBOL / TWELVE_DATA_NASDAQ_SYMBOL if your plan has DXY/IXIC. */
+  private get symbolMap(): Record<string, string> {
+    return {
+      'macro.dxy': process.env.TWELVE_DATA_DXY_SYMBOL || 'UUP',   // UUP = ETF DXY; set to DXY if available
+      'eq.nasdaq': process.env.TWELVE_DATA_NASDAQ_SYMBOL || 'QQQ', // QQQ = ETF Nasdaq-100; set to IXIC if available
+      'eq.leaders': '',
+    };
+  }
 
   private leaderSymbols = ['NVDA', 'MSFT', 'AAPL', 'GOOGL'];
 
