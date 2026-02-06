@@ -233,11 +233,6 @@ export default function DashboardPage() {
               </div>
             </div>
           )}
-          {scoreHistory.length > 0 && hoveredScoreBar && (
-            <p className="text-xs font-medium text-gray-700 mt-2">
-              {t('dashboard.scoreHistoryHoverLabel')} {hoveredScoreBar.week_start_date} → {hoveredScoreBar.score}
-            </p>
-          )}
         </div>
         <div className="border rounded-lg p-4 bg-white shadow-sm">
           <h2 className="text-sm font-medium text-gray-500">{t('dashboard.scenario')}</h2>
