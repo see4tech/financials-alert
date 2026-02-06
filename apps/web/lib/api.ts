@@ -57,6 +57,27 @@ export async function createRule(json_rule: Record<string, unknown>) {
   return res.json();
 }
 
+export async function updateRule(
+  id: string,
+  updates: { json_rule?: Record<string, unknown>; is_enabled?: boolean },
+) {
+  const res = await fetch(`${API_BASE}/api/rules/${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(updates),
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+export async function deleteRule(id: string): Promise<{ deleted: boolean }> {
+  const res = await fetch(`${API_BASE}/api/rules/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
 /** Trigger the run-jobs Netlify function. Pass cronSecret if CRON_SECRET is set in Netlify. */
 export async function triggerRunJobs(cronSecret?: string): Promise<{ ok: boolean }> {
   const base = typeof window !== 'undefined' ? '' : API_BASE || 'http://localhost:3000';
