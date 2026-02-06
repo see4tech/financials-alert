@@ -57,8 +57,8 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
   }
 
   const points = data?.data || [];
-  const maxVal = Math.max(...points.map((p) => p.value), 1);
-  const minVal = Math.min(...points.map((p) => p.value), 0);
+  const maxVal = points.length ? Math.max(...points.map((p) => p.value)) : 1;
+  const minVal = points.length ? Math.min(...points.map((p) => p.value)) : 0;
   const rangeVal = maxVal - minVal || 1;
   const yTicks = [maxVal, minVal + rangeVal * 0.5, minVal].filter((v, i, a) => a.indexOf(v) === i);
   const xStep = Math.max(1, Math.floor(points.length / 5));
