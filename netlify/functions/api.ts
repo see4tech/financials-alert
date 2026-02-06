@@ -40,6 +40,12 @@ async function getApp(): Promise<express.Express> {
   app = express();
   app.use(express.json());
 
+  app.get('/api/config', (_req: Request, res: Response) => {
+    const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
+    const anonKey = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? null;
+    res.json({ supabaseUrl: url ?? null, supabaseAnonKey: anonKey ?? null });
+  });
+
   app.get('/api/dashboard/today', async (req: Request, res: Response) => {
     try {
       const timezone = (req.query.timezone as string) || 'America/Santo_Domingo';
