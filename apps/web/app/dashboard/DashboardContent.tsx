@@ -385,12 +385,6 @@ export function DashboardContent(props: DashboardContentProps) {
                 </span>
                 <span className="cb-action-label">{recsLoading ? '...' : t('dashboard.generateRecommendations')}</span>
               </button>
-              <button type="button" onClick={() => setActiveTab('scanner')} className="cb-action-btn group">
-                <span className="cb-action-circle bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/60">
-                  <SearchIcon />
-                </span>
-                <span className="cb-action-label">{t('dashboard.scanMarket')}</span>
-              </button>
             </div>
           )}
 
@@ -506,49 +500,73 @@ function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoadi
     <>
       {/* Controls card */}
       <section className="cb-card p-5 mb-6">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-1">{t('dashboard.scanResults')}</h2>
-        <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">{t('dashboard.scanMarketHint')}</p>
-
-        <div className="flex flex-wrap items-end gap-4 mb-4">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center text-indigo-600 dark:text-indigo-400 shrink-0">
+            <SearchIcon />
+          </span>
           <div>
-            <label htmlFor="scan-count" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('dashboard.scanCountLabel')}</label>
-            <select id="scan-count" value={scanCount} onChange={(e) => setScanCount(Number(e.target.value))} disabled={scanLoading}
-              className="rounded-xl border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 px-3 py-2 text-sm text-slate-700 dark:text-slate-300 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 disabled:opacity-50">
-              {SCAN_COUNT_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
-            </select>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 leading-tight">{t('dashboard.scanResults')}</h2>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('dashboard.scanMarketHint')}</p>
           </div>
+        </div>
 
-          <div>
-            <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">{t('dashboard.scanAssetTypeFilter')}</span>
-            <div className="flex flex-wrap gap-1.5">
-              {ALL_ASSET_TYPES.map((type) => {
-                const active = scanAssetTypes.includes(type);
-                const cActive = type === 'stock' ? 'bg-blue-600 text-white' : type === 'etf' ? 'bg-emerald-600 text-white' : type === 'commodity' ? 'bg-amber-600 text-white' : 'bg-purple-600 text-white';
-                const cInactive = 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-600';
-                return (
-                  <button key={type} type="button" onClick={() => toggleAssetType(type)} disabled={scanLoading}
-                    className={`rounded-full px-3 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${active ? cActive : cInactive}`}>
-                    {typeLabel(type)}
-                  </button>
-                );
-              })}
-            </div>
+        {/* Count selector */}
+        <div className="mb-4">
+          <label htmlFor="scan-count" className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">{t('dashboard.scanCountLabel')}</label>
+          <div className="flex flex-wrap gap-2">
+            {SCAN_COUNT_OPTIONS.map((n) => (
+              <button key={n} type="button" onClick={() => setScanCount(n)} disabled={scanLoading}
+                className={`w-10 h-10 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 ${
+                  scanCount === n
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-600'
+                }`}>
+                {n}
+              </button>
+            ))}
           </div>
+        </div>
 
-          <div className="flex items-center gap-2">
-            <button type="button" onClick={() => handleMarketScan(scanCount, scanAssetTypes)} disabled={scanLoading}
-              className="rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm">
-              {scanLoading ? t('common.loading') : t('dashboard.scanMarket')}
+        {/* Asset type filter */}
+        <div className="mb-5">
+          <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">{t('dashboard.scanAssetTypeFilter')}</span>
+          <div className="flex flex-wrap gap-2">
+            {ALL_ASSET_TYPES.map((type) => {
+              const active = scanAssetTypes.includes(type);
+              const cActive = type === 'stock'
+                ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border-blue-300 dark:border-blue-700'
+                : type === 'etf'
+                ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700'
+                : type === 'commodity'
+                ? 'bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700'
+                : 'bg-purple-50 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400 border-purple-300 dark:border-purple-700';
+              const cInactive = 'bg-white dark:bg-slate-700 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-600';
+              return (
+                <button key={type} type="button" onClick={() => toggleAssetType(type)} disabled={scanLoading}
+                  className={`rounded-xl border px-4 py-2 text-sm font-medium transition-colors disabled:opacity-50 ${active ? cActive : cInactive}`}>
+                  {active && <span className="mr-1.5">&#10003;</span>}{typeLabel(type)}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Scan / Stop buttons */}
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={() => handleMarketScan(scanCount, scanAssetTypes)} disabled={scanLoading}
+            className="flex-1 sm:flex-none rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm">
+            {scanLoading ? t('common.loading') : t('dashboard.scanMarket')}
+          </button>
+          {scanLoading && (
+            <button type="button" onClick={handleStopScan} className="rounded-xl border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 px-5 py-2.5 text-sm font-medium text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors">
+              {t('dashboard.scanStop')}
             </button>
-            {scanLoading && (
-              <button type="button" onClick={handleStopScan} className="rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition-colors shadow-sm">{t('dashboard.scanStop')}</button>
-            )}
-          </div>
+          )}
         </div>
 
         {/* Progress bar */}
         {scanLoading && scanResults && scanTotal > 0 && (
-          <div>
+          <div className="mt-4">
             <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
               <span>{t('dashboard.scanProgress').replace('{loaded}', String(scanResults.length)).replace('{total}', String(scanTotal))}</span>
               <span>{Math.round((scanResults.length / scanTotal) * 100)}%</span>
@@ -559,7 +577,7 @@ function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoadi
           </div>
         )}
 
-        {!hasLlmKey && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{t('dashboard.configureLlmHint')}</p>}
+        {!hasLlmKey && <p className="text-xs text-slate-500 dark:text-slate-400 mt-3">{t('dashboard.configureLlmHint')}</p>}
         {scanError && <p className="text-sm text-red-600 dark:text-red-400 mt-3">{scanError}</p>}
       </section>
 
