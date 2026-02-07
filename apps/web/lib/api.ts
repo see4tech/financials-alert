@@ -181,9 +181,11 @@ export async function fetchMarketScan(
   locale = 'en',
   count = 5,
   assetTypes?: string[],
+  exclude?: string[],
 ): Promise<{ scan: MarketScanResult[] }> {
   const payload: Record<string, unknown> = { locale, count };
   if (assetTypes && assetTypes.length > 0) payload.assetTypes = assetTypes;
+  if (exclude && exclude.length > 0) payload.exclude = exclude;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 55000); // 55s client timeout
   let res: Response;

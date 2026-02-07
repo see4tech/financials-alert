@@ -121,7 +121,7 @@ export default function SettingsPage() {
 
   if (!clientReady || loading) {
     return (
-      <main className="min-h-screen p-8 max-w-2xl mx-auto">
+      <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-2xl mx-auto">
         <NavBar />
         <p className="text-slate-500 dark:text-slate-400">{t('common.loading')}</p>
       </main>
@@ -129,7 +129,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen p-8 max-w-2xl mx-auto">
+    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-2xl mx-auto">
       <NavBar />
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('settings.title')}</h1>
 

@@ -1060,7 +1060,13 @@ async function getApp(): Promise<express.Express> {
         if (filtered.length > 0) assetTypes = filtered;
       }
 
-      console.log('[market-scan] locale:', userLocale, 'count:', count, 'assetTypes:', assetTypes);
+      // Read exclude list (symbols already returned in previous batches)
+      const rawExclude = req.body?.exclude;
+      const excludeSet = new Set<string>(
+        Array.isArray(rawExclude) ? rawExclude.filter((s: unknown) => typeof s === 'string').map((s: string) => s.toUpperCase()) : [],
+      );
+
+      console.log('[market-scan] locale:', userLocale, 'count:', count, 'assetTypes:', assetTypes, 'exclude:', excludeSet.size);
 
       // Phase 1: Fetch screening data in parallel (only for requested asset types)
       // Each source is wrapped so one timeout doesn't kill the entire scan
@@ -1078,8 +1084,11 @@ async function getApp(): Promise<express.Express> {
       ]);
       console.log(`[market-scan] Phase 1 done in ${Date.now()}ms: stocks=${stocks.length}, etfs=${etfs.length}, crypto=${crypto.length}, commodities=${commodities.length}`);
 
-      const allCandidates = [...stocks, ...etfs, ...crypto, ...commodities];
+      const allCandidates = [...stocks, ...etfs, ...crypto, ...commodities]
+        .filter((c) => !excludeSet.has(c.symbol.toUpperCase()));
       if (allCandidates.length === 0) {
+        // If all candidates were excluded, return empty (not an error – the client already has results)
+        if (excludeSet.size > 0) return res.json({ scan: [] });
         return res.status(500).json({ error: 'Could not fetch screening data from any source.' });
       }
 

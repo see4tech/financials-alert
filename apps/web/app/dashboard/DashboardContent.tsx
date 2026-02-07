@@ -58,9 +58,11 @@ export type DashboardContentProps = {
   setHoveredCard: (v: string | null) => void;
   hoveredCard: string | null;
   handleMarketScan: (count: number, assetTypes: string[]) => void;
+  handleStopScan: () => void;
   scanLoading: boolean;
   scanResults: MarketScanResult[] | null;
   scanError: string | null;
+  scanTotal: number;
 };
 
 type TabId = 'indicators' | 'assets' | 'scanner';
@@ -103,9 +105,11 @@ export function DashboardContent(props: DashboardContentProps) {
     setHoveredCard,
     hoveredCard,
     handleMarketScan,
+    handleStopScan,
     scanLoading,
     scanResults,
     scanError,
+    scanTotal,
   } = props;
 
   const [activeTab, setActiveTab] = useState<TabId>('indicators');
@@ -117,7 +121,7 @@ export function DashboardContent(props: DashboardContentProps) {
   ];
 
   return (
-    <div role="main" className="min-h-screen p-8 max-w-6xl mx-auto">
+    <div role="main" className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-6xl mx-auto">
       <NavBar />
 
       {/* ── Header ── */}
@@ -513,9 +517,11 @@ export function DashboardContent(props: DashboardContentProps) {
           t={t}
           locale={locale}
           handleMarketScan={handleMarketScan}
+          handleStopScan={handleStopScan}
           scanLoading={scanLoading}
           scanResults={scanResults}
           scanError={scanError}
+          scanTotal={scanTotal}
           hasLlmKey={hasLlmKey}
         />
       )}
@@ -540,17 +546,21 @@ function ScannerSection({
   t,
   locale,
   handleMarketScan,
+  handleStopScan,
   scanLoading,
   scanResults,
   scanError,
+  scanTotal,
   hasLlmKey,
 }: {
   t: (key: string) => string;
   locale: string;
   handleMarketScan: (count: number, assetTypes: string[]) => void;
+  handleStopScan: () => void;
   scanLoading: boolean;
   scanResults: MarketScanResult[] | null;
   scanError: string | null;
+  scanTotal: number;
   hasLlmKey: boolean;
 }) {
   const [scanCount, setScanCount] = useState<number>(5);
@@ -628,21 +638,52 @@ function ScannerSection({
           </div>
         </div>
 
-        {/* Scan button */}
-        <button
-          type="button"
-          onClick={() => handleMarketScan(scanCount, scanAssetTypes)}
-          disabled={scanLoading}
-          className="rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
-        >
-          {scanLoading ? t('common.loading') : t('dashboard.scanMarket')}
-        </button>
+        {/* Scan / Stop buttons */}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleMarketScan(scanCount, scanAssetTypes)}
+            disabled={scanLoading}
+            className="rounded-xl bg-indigo-600 px-5 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            {scanLoading ? t('common.loading') : t('dashboard.scanMarket')}
+          </button>
+          {scanLoading && (
+            <button
+              type="button"
+              onClick={handleStopScan}
+              className="rounded-xl bg-red-500 px-4 py-2 text-sm font-medium text-white hover:bg-red-600 transition-colors shadow-sm"
+            >
+              {t('dashboard.scanStop')}
+            </button>
+          )}
+        </div>
       </div>
+
+      {/* Progress bar */}
+      {scanLoading && scanResults && scanTotal > 0 && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-xs text-slate-600 dark:text-slate-400 mb-1">
+            <span>
+              {t('dashboard.scanProgress')
+                .replace('{loaded}', String(scanResults.length))
+                .replace('{total}', String(scanTotal))}
+            </span>
+            <span>{Math.round((scanResults.length / scanTotal) * 100)}%</span>
+          </div>
+          <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-indigo-500 rounded-full transition-all duration-500 ease-out"
+              style={{ width: `${Math.round((scanResults.length / scanTotal) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
 
       {!hasLlmKey && <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{t('dashboard.configureLlmHint')}</p>}
       {scanError && <p className="text-sm text-red-600 dark:text-red-400 mb-4">{scanError}</p>}
       {scanResults && scanResults.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
           {scanResults.map((item, i) => {
             const typeKey = item.asset_type === 'stock' ? 'Stock' : item.asset_type === 'etf' ? 'Etf' : item.asset_type === 'commodity' ? 'Commodity' : 'Crypto';
             const typeBadge =

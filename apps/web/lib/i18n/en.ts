@@ -156,6 +156,8 @@ export const en = {
     scanEmpty: 'No scan results found. Try again later.',
     scanCountLabel: 'Number of results',
     scanAssetTypeFilter: 'Asset types',
+    scanProgress: 'Loading {loaded} of {total}…',
+    scanStop: 'Stop',
     tabIndicators: 'Indicators & Scores',
     tabAssets: 'My Assets',
     tabScanner: 'Market Scanner',

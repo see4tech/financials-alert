@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/app/context/LocaleContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, fetchMarketScan, getLlmSettings, type AiRecommendation, type MarketScanResult } from '@/lib/api';
@@ -50,6 +50,8 @@ export default function DashboardPage() {
   const [scanLoading, setScanLoading] = useState(false);
   const [scanResults, setScanResults] = useState<MarketScanResult[] | null>(null);
   const [scanError, setScanError] = useState<string | null>(null);
+  const [scanTotal, setScanTotal] = useState(0);
+  const scanCancelledRef = useRef(false);
 
   const statusIconColor = useCallback((s: string): string =>
     s === 'GREEN' ? 'text-emerald-500 dark:text-emerald-400' : s === 'RED' ? 'text-red-500 dark:text-red-400' : s === 'YELLOW' ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500', []);
@@ -220,15 +222,31 @@ export default function DashboardPage() {
     if (!client) return;
     const { data: { session } } = await client.auth.getSession();
     if (!session?.access_token) return;
+
     setScanError(null);
     setScanLoading(true);
-    setScanResults(null);
+    setScanResults([]);
+    setScanTotal(count);
+    scanCancelledRef.current = false;
+
+    const BATCH = 5;
+    const accumulated: MarketScanResult[] = [];
+
     try {
-      const result = await fetchMarketScan(session.access_token, locale, count, assetTypes);
-      console.log('[market-scan] raw response:', JSON.stringify(result));
-      const items = result.scan || [];
-      setScanResults(items);
-      if (items.length === 0) {
+      let remaining = count;
+      while (remaining > 0 && !scanCancelledRef.current) {
+        const batchSize = Math.min(BATCH, remaining);
+        const excludeSymbols = accumulated.map((r) => r.symbol);
+        const result = await fetchMarketScan(session.access_token, locale, batchSize, assetTypes, excludeSymbols);
+        console.log('[market-scan] batch response:', JSON.stringify(result));
+        const items = result.scan || [];
+        if (items.length === 0) break; // no more candidates
+        accumulated.push(...items);
+        setScanResults([...accumulated]);
+        remaining -= items.length;
+      }
+
+      if (accumulated.length === 0 && !scanCancelledRef.current) {
         setScanError('No scan results returned. Check Netlify function logs and your LLM API key in Settings.');
       }
     } catch (e) {
@@ -238,6 +256,10 @@ export default function DashboardPage() {
       setScanLoading(false);
     }
   }, [locale]);
+
+  const handleStopScan = useCallback(() => {
+    scanCancelledRef.current = true;
+  }, []);
 
   if (loading) return <div className="p-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
   if (error) {
@@ -295,8 +317,10 @@ export default function DashboardPage() {
     setHoveredCard={setHoveredCard}
     hoveredCard={hoveredCard}
     handleMarketScan={handleMarketScan}
+    handleStopScan={handleStopScan}
     scanLoading={scanLoading}
     scanResults={scanResults}
     scanError={scanError}
+    scanTotal={scanTotal}
   />;
 }

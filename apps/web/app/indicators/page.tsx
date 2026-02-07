@@ -16,7 +16,7 @@ const CORE_KEYS = [
 export default function IndicatorsPage() {
   const { t } = useLocale();
   return (
-    <main className="min-h-screen p-8 max-w-6xl mx-auto">
+    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-6xl mx-auto">
       <NavBar />
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('indicators.title')}</h1>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

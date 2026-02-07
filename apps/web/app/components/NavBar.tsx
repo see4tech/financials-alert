@@ -70,7 +70,7 @@ export function NavBar() {
     return (
       <Link
         href={href}
-        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+        className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
           isActive
             ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
             : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50'
@@ -90,8 +90,8 @@ export function NavBar() {
   const themeIcon = theme === 'dark' ? <MoonIcon /> : theme === 'light' ? <SunIcon /> : <MonitorIcon />;
 
   return (
-    <nav className="sticky top-0 z-40 -mx-8 mb-8 px-8 py-3 border-b border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80 glass">
-      <div className="flex flex-wrap items-center gap-2">
+    <nav className="fixed top-0 left-0 right-0 z-40 border-b border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80 glass">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-1.5 sm:gap-2">
         {session === true && (
           <>
             {navLink('/dashboard', t('nav.dashboard'))}
@@ -101,7 +101,7 @@ export function NavBar() {
             <button
               type="button"
               onClick={handleLogout}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 transition-colors"
+              className="px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 transition-colors"
             >
               {t('nav.logout')}
             </button>
@@ -115,13 +115,13 @@ export function NavBar() {
         )}
 
         {/* Spacer */}
-        <span className="flex-1" />
+        <span className="flex-1 min-w-0" />
 
         {/* Theme toggle */}
         <button
           type="button"
           onClick={cycleTheme}
-          className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 transition-colors"
+          className="shrink-0 p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 transition-colors"
           aria-label={`Theme: ${theme}`}
           title={`Theme: ${theme}`}
         >
@@ -129,7 +129,7 @@ export function NavBar() {
         </button>
 
         {/* Locale switcher */}
-        <div className="flex items-center gap-1 text-sm">
+        <div className="shrink-0 flex items-center gap-1 text-sm">
           <button
             type="button"
             onClick={() => setLocale('es')}

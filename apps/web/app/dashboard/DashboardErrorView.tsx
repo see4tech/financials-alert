@@ -26,7 +26,7 @@ export function DashboardErrorView(props: DashboardErrorViewProps) {
   } = props;
 
   return (
-    <main className="min-h-screen p-6 md:p-8 max-w-6xl mx-auto">
+    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-6xl mx-auto">
       <NavBar />
       <div className="mb-4 text-red-500 dark:text-red-400">{t('common.error')}: {error}</div>
       <p className="mb-4 text-sm text-slate-600 dark:text-slate-400">{t('dashboard.errorHint')}</p>

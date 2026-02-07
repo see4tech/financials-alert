@@ -163,11 +163,11 @@ export default function AlertsPage() {
     }
   };
 
-  if (loading) return <div className="p-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
-  if (error) return <div className="p-8 text-red-600 dark:text-red-400">{t('common.error')}: {error}</div>;
+  if (loading) return <div className="pt-16 p-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
+  if (error) return <div className="pt-16 p-8 text-red-500 dark:text-red-400">{t('common.error')}: {error}</div>;
 
   return (
-    <main className="min-h-screen p-8 max-w-4xl mx-auto">
+    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-4xl mx-auto">
       <NavBar />
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('alerts.title')}</h1>
 

@@ -159,6 +159,8 @@ export const es: typeof en = {
     scanEmpty: 'No se encontraron resultados. Intenta de nuevo más tarde.',
     scanCountLabel: 'Cantidad de resultados',
     scanAssetTypeFilter: 'Tipos de activo',
+    scanProgress: 'Cargando {loaded} de {total}…',
+    scanStop: 'Detener',
     tabIndicators: 'Indicadores y puntuaciones',
     tabAssets: 'Mis activos',
     tabScanner: 'Escáner de mercado',
