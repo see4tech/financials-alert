@@ -184,11 +184,26 @@ export async function fetchMarketScan(
 ): Promise<{ scan: MarketScanResult[] }> {
   const payload: Record<string, unknown> = { locale, count };
   if (assetTypes && assetTypes.length > 0) payload.assetTypes = assetTypes;
-  const res = await fetch(`${API_BASE}/api/market-scan`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify(payload),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 55000); // 55s client timeout
+  let res: Response;
+  try {
+    res = await fetch(`${API_BASE}/api/market-scan`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+  } catch (e: unknown) {
+    clearTimeout(timer);
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(locale === 'es'
+        ? 'El escaneo tardó demasiado. Intenta con menos resultados o menos tipos de activo.'
+        : 'Scan timed out. Try fewer results or fewer asset types.');
+    }
+    throw e;
+  }
+  clearTimeout(timer);
   await throwOnNotOk(res);
   const text = await res.text();
   try {

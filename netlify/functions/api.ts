@@ -84,6 +84,11 @@ async function fetchWithTimeout(url: string, init: RequestInit & { timeout?: num
   const timer = setTimeout(() => controller.abort(), timeout);
   try {
     return await fetch(url, { ...fetchInit, signal: controller.signal });
+  } catch (e: unknown) {
+    if (e instanceof Error && e.name === 'AbortError') {
+      throw new Error(`Request timed out after ${timeout}ms: ${url.split('?')[0]}`);
+    }
+    throw e;
   } finally {
     clearTimeout(timer);
   }
@@ -588,7 +593,7 @@ ${candidatesText}
 Respond with a JSON object containing a "picks" array of exactly ${count} objects, each with keys: symbol (string), name (string), asset_type (string), action (string "buy"), current_price (number), entry_price (number), take_profit (number), stop_loss (number), reasoning_en (string in English), reasoning_es (string in Spanish).`;
 
   const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
-    timeout: 22000,
+    timeout: 28000,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -1065,14 +1070,17 @@ async function getApp(): Promise<express.Express> {
       console.log('[market-scan] locale:', userLocale, 'count:', count, 'assetTypes:', assetTypes);
 
       // Phase 1: Fetch screening data in parallel (only for requested asset types)
-      // Also fetch dashboard context in parallel to save time
+      // Each source is wrapped so one timeout doesn't kill the entire scan
       const twelveDataKey = process.env.TWELVE_DATA_API_KEY || '';
       console.log('[market-scan] Phase 1: fetching screening data + dashboard context...');
+      const safeResolve = async (fn: () => Promise<ScanCandidate[]>, label: string): Promise<ScanCandidate[]> => {
+        try { return await fn(); } catch (e) { console.warn(`[market-scan] ${label} failed:`, e instanceof Error ? e.message : e); return []; }
+      };
       const [stocks, etfs, crypto, commodities, dashboard] = await Promise.all([
-        assetTypes.includes('stock') ? fetchNasdaqScreener('stocks', 100, twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
-        assetTypes.includes('etf') ? fetchNasdaqScreener('etf', 50, twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
-        assetTypes.includes('crypto') ? fetchCoinGeckoTop(30) : Promise.resolve([] as ScanCandidate[]),
-        assetTypes.includes('commodity') && twelveDataKey ? fetchCommodityQuotes(twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('stock') ? safeResolve(() => fetchNasdaqScreener('stocks', 100, twelveDataKey), 'stocks') : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('etf') ? safeResolve(() => fetchNasdaqScreener('etf', 50, twelveDataKey), 'etfs') : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('crypto') ? safeResolve(() => fetchCoinGeckoTop(30), 'crypto') : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('commodity') && twelveDataKey ? safeResolve(() => fetchCommodityQuotes(twelveDataKey), 'commodities') : Promise.resolve([] as ScanCandidate[]),
         dashboardService.getToday('UTC'),
       ]);
       console.log(`[market-scan] Phase 1 results: stocks=${stocks.length}, etfs=${etfs.length}, crypto=${crypto.length}, commodities=${commodities.length}`);
@@ -1091,16 +1099,21 @@ async function getApp(): Promise<express.Express> {
       console.log('[market-scan] Top picked:', topPicked.map((c) => `${c.symbol}(${c.asset_type}:${c.score.toFixed(1)})`).join(', '));
 
       // Phase 3: Fetch detailed quotes only for candidates missing price data
+      // Wrapped safely – missing quotes are not fatal; AI can still work without exact prices
       const needQuotes = topPicked.filter((c) => c.asset_type !== 'crypto' && c.current_price == null).map((c) => c.symbol);
       if (needQuotes.length > 0 && twelveDataKey) {
         console.log('[market-scan] Phase 3: fetching quotes for', needQuotes.length, 'symbols missing price data');
-        const quotes = await fetchTwelveDataBatchQuotes(needQuotes, twelveDataKey);
-        for (const c of topPicked) {
-          const q = quotes[c.symbol];
-          if (q) {
-            if (q.close != null) c.current_price = q.close;
-            if (q.fifty_two_week_high != null) c.fifty_two_week_high = q.fifty_two_week_high;
+        try {
+          const quotes = await fetchTwelveDataBatchQuotes(needQuotes, twelveDataKey);
+          for (const c of topPicked) {
+            const q = quotes[c.symbol];
+            if (q) {
+              if (q.close != null) c.current_price = q.close;
+              if (q.fifty_two_week_high != null) c.fifty_two_week_high = q.fifty_two_week_high;
+            }
           }
+        } catch (e) {
+          console.warn('[market-scan] Phase 3 quote fetch failed (non-fatal):', e instanceof Error ? e.message : e);
         }
       }
 
@@ -1130,7 +1143,12 @@ async function getApp(): Promise<express.Express> {
       return res.json({ scan });
     } catch (e) {
       console.error('/api/market-scan error:', e);
-      return res.status(500).json({ error: errorMessage(e) });
+      const msg = e instanceof Error ? e.message : String(e);
+      // Make timeout errors more user-friendly
+      if (msg.includes('timed out') || msg.includes('aborted') || (e instanceof Error && e.name === 'AbortError')) {
+        return res.status(504).json({ error: 'Scan timed out. Try fewer results or fewer asset types.' });
+      }
+      return res.status(500).json({ error: msg });
     }
   });
 

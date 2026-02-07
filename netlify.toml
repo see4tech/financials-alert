@@ -7,6 +7,9 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[functions."api"]
+  timeout = 60
+
 [functions."populate-symbols"]
   timeout = 60
 
