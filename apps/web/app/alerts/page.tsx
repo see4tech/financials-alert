@@ -163,11 +163,11 @@ export default function AlertsPage() {
     }
   };
 
-  if (loading) return <div className="pt-16 p-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
-  if (error) return <div className="pt-16 p-8 text-red-500 dark:text-red-400">{t('common.error')}: {error}</div>;
+  if (loading) return <div className="pt-16 p-8 pb-24 md:pb-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
+  if (error) return <div className="pt-16 p-8 pb-24 md:pb-8 text-red-500 dark:text-red-400">{t('common.error')}: {error}</div>;
 
   return (
-    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-4xl mx-auto">
+    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-24 md:pb-8 max-w-4xl mx-auto">
       <NavBar />
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('alerts.title')}</h1>
 
@@ -185,29 +185,14 @@ export default function AlertsPage() {
         {submitError && <p className="mb-2 text-sm text-red-600 dark:text-red-400">{submitError}</p>}
         <ul className="space-y-2">
           {rules.map((r) => (
-            <li
-              key={r.id}
-              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 flex flex-wrap items-center justify-between gap-2 shadow-sm"
-            >
+            <li key={r.id} className="cb-card p-4 flex flex-wrap items-center justify-between gap-2">
               <span className="font-mono text-sm text-slate-900 dark:text-slate-100">{String(r.json_rule?.name ?? r.id)}</span>
               <div className="flex items-center gap-2">
-                <span className={r.is_enabled ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}>
+                <span className={r.is_enabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400 dark:text-slate-500'}>
                   {r.is_enabled ? t('alerts.on') : t('alerts.off')}
                 </span>
-                <button
-                  type="button"
-                  onClick={() => openEdit(r)}
-                  className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
-                >
-                  {t('alerts.editRule')}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleDelete(r.id)}
-                  className="text-sm text-red-600 dark:text-red-400 hover:underline"
-                >
-                  {t('alerts.deleteRule')}
-                </button>
+                <button type="button" onClick={() => openEdit(r)} className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">{t('alerts.editRule')}</button>
+                <button type="button" onClick={() => handleDelete(r.id)} className="text-sm text-red-600 dark:text-red-400 hover:underline">{t('alerts.deleteRule')}</button>
               </div>
             </li>
           ))}
@@ -216,7 +201,7 @@ export default function AlertsPage() {
       </section>
 
       {formOpen && (
-        <div className="mb-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
+        <div className="mb-8 cb-card p-5">
           <h3 className="text-md font-semibold text-slate-900 dark:text-slate-100 mb-3">
             {editingId ? t('alerts.editRule') : t('alerts.createRule')}
           </h3>
@@ -351,7 +336,7 @@ export default function AlertsPage() {
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">{t('alerts.firedAlerts')}</h2>
         <ul className="space-y-2">
           {fired.map((a) => (
-            <li key={a.id} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm shadow-sm">
+            <li key={a.id} className="cb-card p-4 text-sm">
               <span className="text-slate-500 dark:text-slate-400">{new Date(a.ts).toLocaleString()}</span>
               <pre className="mt-1 overflow-auto text-slate-700 dark:text-slate-300">{JSON.stringify(a.payload ?? {}, null, 0)}</pre>
             </li>

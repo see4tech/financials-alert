@@ -53,10 +53,10 @@ export default function SignupPage() {
 
   if (clientReady && authConfigured === false) {
     return (
-      <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 bg-slate-50 dark:bg-slate-900">
+      <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-24 md:pb-8 bg-slate-50 dark:bg-slate-900">
         <NavBar />
         <div className="flex items-center justify-center mt-12">
-          <div className="w-full max-w-sm rounded-xl p-6 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700">
+          <div className="w-full max-w-sm cb-card p-6">
             <p className="text-sm text-amber-800 dark:text-amber-300 mb-4">{t('auth.notConfigured')}</p>
             <Link href="/dashboard" className="text-indigo-600 dark:text-indigo-400 hover:underline">
               {t('nav.dashboard')}
@@ -68,10 +68,10 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 bg-slate-50 dark:bg-slate-900">
+    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-24 md:pb-8 bg-slate-50 dark:bg-slate-900">
       <NavBar />
       <div className="flex items-center justify-center mt-12">
-      <div className="w-full max-w-sm rounded-xl p-6 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700">
+      <div className="w-full max-w-sm cb-card p-6">
         <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">{t('auth.signup')}</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

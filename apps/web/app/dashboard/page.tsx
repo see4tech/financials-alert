@@ -261,7 +261,7 @@ export default function DashboardPage() {
     scanCancelledRef.current = true;
   }, []);
 
-  if (loading) return <div className="p-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
+  if (loading) return <div className="pt-16 p-8 pb-24 md:pb-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
   if (error) {
     return <DashboardErrorView
       error={error}

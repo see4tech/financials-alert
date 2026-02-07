@@ -10,6 +10,7 @@ export const es: typeof en = {
     logout: 'Cerrar sesión',
     login: 'Iniciar sesión',
     signup: 'Registrarse',
+    scanner: 'Escáner',
   },
   auth: {
     login: 'Iniciar sesión',

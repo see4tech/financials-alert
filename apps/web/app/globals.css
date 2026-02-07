@@ -67,3 +67,23 @@ html.no-transitions *, html.no-transitions *::before, html.no-transitions *::aft
     -webkit-backdrop-filter: blur(12px) saturate(180%);
   }
 }
+
+/* ── Coinbase-style card ── */
+@layer components {
+  .cb-card {
+    @apply rounded-2xl bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 shadow-sm;
+  }
+  .cb-card-hover {
+    @apply cb-card hover:shadow-md transition-shadow;
+  }
+  /* Circular action button (Coinbase-style) */
+  .cb-action-btn {
+    @apply flex flex-col items-center gap-1.5;
+  }
+  .cb-action-circle {
+    @apply w-12 h-12 rounded-full flex items-center justify-center transition-colors;
+  }
+  .cb-action-label {
+    @apply text-[11px] font-medium text-slate-600 dark:text-slate-400 whitespace-nowrap;
+  }
+}

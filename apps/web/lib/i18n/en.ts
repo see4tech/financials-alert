@@ -8,6 +8,7 @@ export const en = {
     logout: 'Log out',
     login: 'Log in',
     signup: 'Sign up',
+    scanner: 'Scanner',
   },
   auth: {
     login: 'Log in',

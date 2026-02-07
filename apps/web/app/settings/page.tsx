@@ -121,7 +121,7 @@ export default function SettingsPage() {
 
   if (!clientReady || loading) {
     return (
-      <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-2xl mx-auto">
+      <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-24 md:pb-8 max-w-2xl mx-auto">
         <NavBar />
         <p className="text-slate-500 dark:text-slate-400">{t('common.loading')}</p>
       </main>
@@ -129,12 +129,12 @@ export default function SettingsPage() {
   }
 
   return (
-    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-8 max-w-2xl mx-auto">
+    <main className="min-h-screen pt-16 px-4 sm:px-6 lg:px-8 pb-24 md:pb-8 max-w-2xl mx-auto">
       <NavBar />
       <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('settings.title')}</h1>
 
       {/* Theme selector */}
-      <section className="rounded-xl p-5 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 mb-6">
+      <section className="cb-card p-5 mb-6">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('settings.theme')}</h2>
         <div className="flex gap-3">
           {THEME_OPTIONS.map((opt) => {
@@ -160,7 +160,7 @@ export default function SettingsPage() {
       </section>
 
       {/* LLM settings */}
-      <section className="rounded-xl p-5 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700">
+      <section className="cb-card p-5">
         <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('settings.llmSectionTitle')}</h2>
         <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{t('settings.llmSectionHint')}</p>
         {error && <p className="mb-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
