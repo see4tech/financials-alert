@@ -181,18 +181,26 @@ export function DashboardContent(props: DashboardContentProps) {
 
         {/* ── Action buttons row (Coinbase circular buttons) ── */}
         <div className="flex items-start gap-6 mt-6 pt-5 border-t border-slate-100 dark:border-slate-700">
-          <button type="button" onClick={() => runJobsNow()} disabled={runJobsLoading} className="cb-action-btn group">
-            <span className="cb-action-circle bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-900/60 group-disabled:opacity-50">
-              <RefreshIcon />
+          <button type="button" onClick={() => runJobsNow()} disabled={runJobsLoading} className="cb-action-btn group disabled:pointer-events-none">
+            <span className={`cb-action-circle transition-colors ${runJobsLoading ? 'bg-indigo-200 dark:bg-indigo-800/50 text-indigo-400 dark:text-indigo-500 animate-pulse' : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-900/60'}`}>
+              {runJobsLoading ? (
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+              ) : (
+                <RefreshIcon />
+              )}
             </span>
-            <span className="cb-action-label">{runJobsLoading ? '...' : t('dashboard.runJobs')}</span>
+            <span className={`cb-action-label ${runJobsLoading ? 'text-slate-400 dark:text-slate-500' : ''}`}>{runJobsLoading ? t('common.loading') : t('dashboard.runJobs')}</span>
           </button>
 
-          <button type="button" onClick={() => runBackfillNow(cronSecretInput.trim() || undefined)} disabled={backfillLoading} className="cb-action-btn group" title={t('dashboard.backfillHint')}>
-            <span className="cb-action-circle bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-600 group-disabled:opacity-50">
-              <HistoryIcon />
+          <button type="button" onClick={() => runBackfillNow(cronSecretInput.trim() || undefined)} disabled={backfillLoading} className="cb-action-btn group disabled:pointer-events-none" title={t('dashboard.backfillHint')}>
+            <span className={`cb-action-circle transition-colors ${backfillLoading ? 'bg-slate-200 dark:bg-slate-600 text-slate-400 dark:text-slate-500 animate-pulse' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400 group-hover:bg-slate-200 dark:group-hover:bg-slate-600'}`}>
+              {backfillLoading ? (
+                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+              ) : (
+                <HistoryIcon />
+              )}
             </span>
-            <span className="cb-action-label">{backfillLoading ? '...' : t('dashboard.backfillHistory')}</span>
+            <span className={`cb-action-label ${backfillLoading ? 'text-slate-400 dark:text-slate-500' : ''}`}>{backfillLoading ? t('common.loading') : t('dashboard.backfillHistory')}</span>
           </button>
         </div>
 
