@@ -111,6 +111,28 @@ export async function saveLlmSettings(
   return res.json();
 }
 
+// ── User preferences (locale) ──
+export async function getUserPreferences(accessToken: string): Promise<{ locale: string }> {
+  const res = await fetch(`${API_BASE}/api/user/preferences`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+export async function saveUserPreferences(
+  accessToken: string,
+  payload: { locale: string },
+): Promise<{ locale: string; saved: boolean }> {
+  const res = await fetch(`${API_BASE}/api/user/preferences`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(payload),
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
 export type AiRecommendation = {
   symbol: string;
   action: string;
@@ -137,6 +159,27 @@ export async function fetchRecommendations(accessToken: string): Promise<{ recom
     console.error('[fetchRecommendations] failed to parse response:', text.slice(0, 500));
     throw e;
   }
+}
+
+// ── Symbol search ──
+export type SymbolResult = { symbol: string; name: string; asset_type: string; exchange: string | null };
+
+export async function searchSymbols(q: string): Promise<{ results: SymbolResult[] }> {
+  const res = await fetch(`${API_BASE}/api/symbols/search?q=${encodeURIComponent(q)}`);
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+/** Populate symbols DB from Twelve Data + CoinGecko. Protected by CRON_SECRET. */
+export async function triggerPopulateSymbols(cronSecret?: string): Promise<{ ok: boolean; results?: Record<string, number> }> {
+  const base = typeof window !== 'undefined' ? '' : API_BASE || 'http://localhost:3000';
+  const url = `${base}/.netlify/functions/populate-symbols`;
+  const headers: Record<string, string> = {};
+  if (cronSecret) headers['X-Cron-Secret'] = cronSecret;
+  const res = await fetch(url, { method: 'POST', headers });
+  if (res.status === 401) throw new Error('Cron secret required.');
+  await throwOnNotOk(res);
+  return res.json();
 }
 
 /** One-time backfill: load 90 days of history for all indicators. Uses same secret as run-jobs (CRON_SECRET). */

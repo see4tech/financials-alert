@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { NavBar } from '@/app/components/NavBar';
+import { AssetSearch } from '@/app/components/AssetSearch';
 import type { AiRecommendation } from '@/lib/api';
 
 type Indicator = { key: string; value?: number; trend: string; status: string; explain?: string; ma21d?: number; referenceText?: string };
@@ -40,18 +41,18 @@ export type DashboardContentProps = {
   setHoveredScoreBar: (v: { week_start_date: string; score: number } | null) => void;
   hoveredSummaryCard: 'weeklyScore' | 'scoreHistory' | null;
   hoveredScoreBar: { week_start_date: string; score: number } | null;
-  userAssets: { id: string; symbol: string; asset_type: string }[];
-  newAssetSymbol: string;
-  setNewAssetSymbol: (v: string) => void;
-  newAssetType: string;
-  setNewAssetType: (v: string) => void;
-  handleAddAsset: (e: React.FormEvent) => void;
+  userAssets: { id: string; symbol: string; asset_type: string; display_name?: string | null }[];
+  handleAddAssetFromSearch: (symbol: string, assetType: string, displayName: string) => void;
   addAssetLoading: boolean;
   handleRemoveAsset: (id: string) => void;
   handleGenerateRecommendations: () => void;
   recsLoading: boolean;
   recsError: string | null;
   aiRecommendations: AiRecommendation[] | null;
+  handlePopulateSymbols: () => void;
+  populateLoading: boolean;
+  populateSuccess: string | null;
+  populateError: string | null;
   setHoveredCard: (v: string | null) => void;
   hoveredCard: string | null;
 };
@@ -83,17 +84,17 @@ export function DashboardContent(props: DashboardContentProps) {
     hoveredSummaryCard,
     hoveredScoreBar,
     userAssets,
-    newAssetSymbol,
-    setNewAssetSymbol,
-    newAssetType,
-    setNewAssetType,
-    handleAddAsset,
+    handleAddAssetFromSearch,
     addAssetLoading,
     handleRemoveAsset,
     handleGenerateRecommendations,
     recsLoading,
     recsError,
     aiRecommendations,
+    handlePopulateSymbols,
+    populateLoading,
+    populateSuccess,
+    populateError,
     setHoveredCard,
     hoveredCard,
   } = props;
@@ -312,49 +313,27 @@ export function DashboardContent(props: DashboardContentProps) {
 
       <h2 className="text-xl font-semibold mb-4">{t('dashboard.myAssets')}</h2>
       <p className="text-sm text-gray-600 mb-3">{t('dashboard.myAssetsHint')}</p>
-      <div className="mb-6 flex flex-wrap items-end gap-3">
-        <form onSubmit={handleAddAsset} className="flex flex-wrap items-end gap-2">
-          <div>
-            <label htmlFor="asset-symbol" className="block text-xs font-medium text-gray-600 mb-1">{t('dashboard.assetSymbol')}</label>
-            <input
-              id="asset-symbol"
-              type="text"
-              value={newAssetSymbol}
-              onChange={(e) => setNewAssetSymbol(e.target.value)}
-              placeholder="AAPL, QQQ, BTC, GOLD"
-              className="border border-gray-300 rounded px-3 py-2 text-sm w-32"
-            />
-          </div>
-          <div>
-            <label htmlFor="asset-type" className="block text-xs font-medium text-gray-600 mb-1">{t('dashboard.assetType')}</label>
-            <select
-              id="asset-type"
-              value={newAssetType}
-              onChange={(e) => setNewAssetType(e.target.value)}
-              className="border border-gray-300 rounded px-3 py-2 text-sm"
-            >
-              <option value="stock">{t('dashboard.assetTypeStock')}</option>
-              <option value="etf">{t('dashboard.assetTypeEtf')}</option>
-              <option value="commodity">{t('dashboard.assetTypeCommodity')}</option>
-              <option value="crypto">{t('dashboard.assetTypeCrypto')}</option>
-            </select>
-          </div>
-          <button type="submit" disabled={addAssetLoading || !newAssetSymbol.trim()} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50">
-            {addAssetLoading ? t('common.loading') : t('dashboard.addAsset')}
-          </button>
-        </form>
+      <div className="mb-4">
+        <AssetSearch
+          onSelect={handleAddAssetFromSearch}
+          loading={addAssetLoading}
+          t={t}
+          existingAssets={userAssets}
+        />
       </div>
       {userAssets.length > 0 && (
         <>
           <ul className="flex flex-wrap gap-2 mb-3">
             {userAssets.map((a) => {
               const typeKey = a.asset_type === 'stock' ? 'Stock' : a.asset_type === 'etf' ? 'Etf' : a.asset_type === 'commodity' ? 'Commodity' : 'Crypto';
+              const typeColor = a.asset_type === 'stock' ? 'bg-blue-50 text-blue-700' : a.asset_type === 'etf' ? 'bg-green-50 text-green-700' : a.asset_type === 'commodity' ? 'bg-amber-50 text-amber-700' : 'bg-purple-50 text-purple-700';
               return (
-                <li key={a.id} className="inline-flex items-center gap-1 rounded-md bg-gray-100 px-2 py-1 text-sm">
-                  <span>{a.symbol}</span>
-                  <span className="text-gray-500 text-xs">({t('dashboard.assetType' + typeKey)})</span>
-                  <button type="button" onClick={() => handleRemoveAsset(a.id)} className="text-red-600 hover:underline text-xs" aria-label={t('dashboard.removeAsset')}>
-                    ×
+                <li key={a.id} className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-sm ${typeColor}`}>
+                  <span className="font-medium">{a.symbol}</span>
+                  {a.display_name && <span className="text-xs opacity-70 hidden sm:inline">- {a.display_name}</span>}
+                  <span className="text-[10px] opacity-60">({t('dashboard.assetType' + typeKey)})</span>
+                  <button type="button" onClick={() => handleRemoveAsset(a.id)} className="ml-0.5 text-red-500 hover:text-red-700 text-xs font-bold" aria-label={t('dashboard.removeAsset')}>
+                    &times;
                   </button>
                 </li>
               );
@@ -372,6 +351,19 @@ export function DashboardContent(props: DashboardContentProps) {
         </>
       )}
       {userAssets.length === 0 && <p className="text-sm text-gray-500 mb-6">{t('dashboard.noAssetsHint')}</p>}
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <button
+          type="button"
+          onClick={handlePopulateSymbols}
+          disabled={populateLoading}
+          className="rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
+          title={t('dashboard.populateSymbolsHint')}
+        >
+          {populateLoading ? t('common.loading') : t('dashboard.populateSymbols')}
+        </button>
+        {populateSuccess && <span className="text-xs text-green-600">{populateSuccess}</span>}
+        {populateError && <span className="text-xs text-red-600">{populateError}</span>}
+      </div>
       {recsError && <p className="text-sm text-red-600 mb-4">{recsError}</p>}
       {aiRecommendations && aiRecommendations.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
@@ -379,8 +371,8 @@ export function DashboardContent(props: DashboardContentProps) {
             <div key={rec.symbol + String(i)} className="border rounded-lg p-4 bg-white shadow-sm">
               <div className="flex items-center justify-between mb-2">
                 <span className="font-semibold">{rec.symbol}</span>
-                <span className={`text-sm font-medium ${rec.action === 'buy' ? 'text-green-600' : rec.action === 'sell' ? 'text-red-600' : 'text-gray-600'}`}>
-                  {rec.action === 'buy' ? t('dashboard.actionBuy') : rec.action === 'sell' ? t('dashboard.actionSell') : t('dashboard.actionHold')}
+                <span className={`text-sm font-medium ${/buy|comprar/i.test(rec.action) ? 'text-green-600' : /sell|vender/i.test(rec.action) ? 'text-red-600' : 'text-gray-600'}`}>
+                  {rec.action}
                 </span>
               </div>
               <dl className="text-sm space-y-1">

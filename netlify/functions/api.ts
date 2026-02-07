@@ -77,16 +77,22 @@ async function fetchPrice(symbol: string, assetType: string): Promise<number | n
   return Number.isNaN(n) ? null : n;
 }
 
+const LOCALE_NAMES: Record<string, string> = { en: 'English', es: 'Spanish' };
+
 /** Call OpenAI chat completions with user's API key. Returns parsed JSON array of recommendations. */
 async function getRecommendationsFromOpenAI(
   apiKey: string,
   dashboardSummary: string,
   assetsWithPrices: { symbol: string; asset_type: string; price: number | null }[],
+  locale = 'en',
 ): Promise<Array<{ symbol: string; action: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning?: string }>> {
   const assetsText = assetsWithPrices
     .map((a) => `${a.symbol} (${a.asset_type}): ${a.price != null ? a.price : 'price unknown'}`)
     .join('\n');
+  const langName = LOCALE_NAMES[locale] || 'English';
   const prompt = `You are a financial assistant. Given the following market context and asset list with current prices, recommend for EACH asset: action (buy, sell, or hold), entry_price, exit_price, take_profit, stop_loss (all as numbers), and a short reasoning.
+
+IMPORTANT: Write the "reasoning" field and the "action" field value in ${langName}. For action use: ${locale === 'es' ? '"comprar", "vender", or "mantener"' : '"buy", "sell", or "hold"'}.
 
 Market context:
 ${dashboardSummary}
@@ -265,6 +271,24 @@ async function getApp(): Promise<express.Express> {
     }
   });
 
+  // ── Symbol search (public – no auth required) ──
+  app.get('/api/symbols/search', async (req: Request, res: Response) => {
+    try {
+      const q = ((req.query.q as string) || '').trim();
+      if (q.length < 1) return res.json({ results: [] });
+      const supabase = getSupabaseService();
+      const { data, error } = await supabase.rpc('search_symbols', { q, lim: 20 });
+      if (error) {
+        console.error('/api/symbols/search', error);
+        return res.status(500).json({ error: errorMessage(error) });
+      }
+      return res.json({ results: data || [] });
+    } catch (e) {
+      console.error('/api/symbols/search', e);
+      return res.status(500).json({ error: errorMessage(e) });
+    }
+  });
+
   app.get('/api/user/llm-settings', async (req: Request, res: Response) => {
     try {
       const userId = await getUserIdFromRequest(req);
@@ -318,6 +342,55 @@ async function getApp(): Promise<express.Express> {
     }
   });
 
+  // ── User preferences (locale, etc.) ──
+  app.get('/api/user/preferences', async (req: Request, res: Response) => {
+    try {
+      const userId = await getUserIdFromRequest(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const supabase = getSupabaseService();
+      const { data: row, error } = await supabase
+        .from('user_preferences')
+        .select('locale')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error) {
+        console.error('/api/user/preferences GET', error);
+        return res.status(500).json({ error: errorMessage(error) });
+      }
+      return res.json({ locale: row?.locale ?? 'en' });
+    } catch (e) {
+      console.error('/api/user/preferences GET', e);
+      return res.status(500).json({ error: errorMessage(e) });
+    }
+  });
+
+  app.post('/api/user/preferences', async (req: Request, res: Response) => {
+    try {
+      const userId = await getUserIdFromRequest(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const { locale } = req.body ?? {};
+      if (typeof locale !== 'string' || !['en', 'es'].includes(locale)) {
+        return res.status(400).json({ error: 'locale must be one of: en, es' });
+      }
+      const supabase = getSupabaseService();
+      const { error } = await supabase
+        .from('user_preferences')
+        .upsert(
+          { user_id: userId, locale, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' },
+        );
+      if (error) {
+        console.error('/api/user/preferences POST', error);
+        return res.status(500).json({ error: errorMessage(error) });
+      }
+      return res.json({ locale, saved: true });
+    } catch (e) {
+      console.error('/api/user/preferences POST', e);
+      return res.status(500).json({ error: errorMessage(e) });
+    }
+  });
+
+  // ── AI Recommendations ──
   app.post('/api/recommendations', async (req: Request, res: Response) => {
     try {
       console.log('[recommendations] handler start');
@@ -349,6 +422,14 @@ async function getApp(): Promise<express.Express> {
         return res.status(400).json({ error: 'Configure your AI provider and API key in Settings first.' });
       }
       console.log('[recommendations] provider:', llmRow.provider, 'apiKey length:', llmRow.api_key?.length);
+      // Read user locale preference
+      const { data: prefRow } = await supabase
+        .from('user_preferences')
+        .select('locale')
+        .eq('user_id', userId)
+        .maybeSingle();
+      const userLocale = (prefRow?.locale as string) || 'en';
+      console.log('[recommendations] userLocale:', userLocale);
       const dashboard = await dashboardService.getToday('UTC');
       const indSummary = dashboard.indicators.map((i: { key: string; status: string; trend: string; value?: number | null }) => `${i.key}: ${i.status} (${i.trend}), value: ${i.value ?? 'n/a'}`).join('\n');
       const dashboardSummary = `Score: ${dashboard.score}, Delta week: ${dashboard.deltaWeek}. Scenario: bull=${dashboard.scenario.bull}, bear=${dashboard.scenario.bear}.\nIndicators:\n${indSummary}`;
@@ -361,7 +442,7 @@ async function getApp(): Promise<express.Express> {
       const provider = (llmRow.provider as string) || 'openai';
       let recommendations: Array<{ symbol: string; action: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning?: string }>;
       if (provider === 'openai') {
-        recommendations = await getRecommendationsFromOpenAI(llmRow.api_key, dashboardSummary, assetsWithPrices);
+        recommendations = await getRecommendationsFromOpenAI(llmRow.api_key, dashboardSummary, assetsWithPrices, userLocale);
       } else {
         return res.status(400).json({ error: `Provider "${provider}" is not yet supported for recommendations. Use OpenAI in Settings.` });
       }

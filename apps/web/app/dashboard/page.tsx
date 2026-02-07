@@ -1,10 +1,9 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { NavBar } from '@/app/components/NavBar';
 import { useLocale } from '@/app/context/LocaleContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
-import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, fetchRecommendations, type AiRecommendation } from '@/lib/api';
+import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, type AiRecommendation } from '@/lib/api';
 import { DashboardContent } from './DashboardContent';
 import { DashboardErrorView } from './DashboardErrorView';
 
@@ -39,13 +38,14 @@ export default function DashboardPage() {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null);
   const [hoveredSummaryCard, setHoveredSummaryCard] = useState<'weeklyScore' | 'scoreHistory' | null>(null);
   const [hoveredScoreBar, setHoveredScoreBar] = useState<{ week_start_date: string; score: number } | null>(null);
-  const [userAssets, setUserAssets] = useState<{ id: string; symbol: string; asset_type: string }[]>([]);
-  const [newAssetSymbol, setNewAssetSymbol] = useState('');
-  const [newAssetType, setNewAssetType] = useState<string>('stock');
+  const [userAssets, setUserAssets] = useState<{ id: string; symbol: string; asset_type: string; display_name?: string | null }[]>([]);
   const [addAssetLoading, setAddAssetLoading] = useState(false);
   const [recsLoading, setRecsLoading] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[] | null>(null);
   const [recsError, setRecsError] = useState<string | null>(null);
+  const [populateLoading, setPopulateLoading] = useState(false);
+  const [populateSuccess, setPopulateSuccess] = useState<string | null>(null);
+  const [populateError, setPopulateError] = useState<string | null>(null);
 
   const statusIconColor = useCallback((s: string): string =>
     s === 'GREEN' ? 'text-green-600' : s === 'RED' ? 'text-red-600' : s === 'YELLOW' ? 'text-amber-500' : 'text-gray-400', []);
@@ -59,7 +59,7 @@ export default function DashboardPage() {
       if (!session?.user?.id) return;
       client
         .from('user_assets')
-        .select('id, symbol, asset_type')
+        .select('id, symbol, asset_type, display_name')
         .eq('user_id', session.user.id)
         .order('created_at', { ascending: true })
         .then(({ data }) => setUserAssets(Array.isArray(data) ? data : []));
@@ -124,10 +124,7 @@ export default function DashboardPage() {
     [t],
   );
 
-  const handleAddAsset = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    const sym = newAssetSymbol.trim().toUpperCase();
-    if (!sym) return;
+  const handleAddAssetFromSearch = useCallback(async (symbol: string, assetType: string, displayName: string) => {
     const client = getSupabaseBrowser();
     if (!client) return;
     const { data: { session } } = await client.auth.getSession();
@@ -136,18 +133,40 @@ export default function DashboardPage() {
     try {
       const { error } = await client.from('user_assets').insert({
         user_id: session.user.id,
-        symbol: sym,
-        asset_type: newAssetType,
+        symbol: symbol.toUpperCase(),
+        asset_type: assetType,
+        display_name: displayName,
       });
       if (error) throw error;
-      setNewAssetSymbol('');
       loadUserAssets();
     } catch (err) {
       console.error(err);
     } finally {
       setAddAssetLoading(false);
     }
-  }, [newAssetSymbol, newAssetType, loadUserAssets]);
+  }, [loadUserAssets]);
+
+  const handlePopulateSymbols = useCallback(async () => {
+    setPopulateError(null);
+    setPopulateSuccess(null);
+    setPopulateLoading(true);
+    try {
+      const res = await triggerPopulateSymbols(cronSecretInput.trim() || undefined);
+      const parts: string[] = [];
+      if (res.results) {
+        for (const [k, v] of Object.entries(res.results)) {
+          parts.push(`${k}: ${v}`);
+        }
+      }
+      setPopulateSuccess(t('dashboard.populateSuccess') + (parts.length > 0 ? ` (${parts.join(', ')})` : ''));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('Cron secret required')) setCronSecretPrompt(true);
+      else setPopulateError(msg);
+    } finally {
+      setPopulateLoading(false);
+    }
+  }, [cronSecretInput, t]);
 
   const handleRemoveAsset = useCallback(async (id: string) => {
     const client = getSupabaseBrowser();
@@ -221,17 +240,17 @@ export default function DashboardPage() {
     hoveredSummaryCard={hoveredSummaryCard}
     hoveredScoreBar={hoveredScoreBar}
     userAssets={userAssets}
-    newAssetSymbol={newAssetSymbol}
-    setNewAssetSymbol={setNewAssetSymbol}
-    newAssetType={newAssetType}
-    setNewAssetType={setNewAssetType}
-    handleAddAsset={handleAddAsset}
+    handleAddAssetFromSearch={handleAddAssetFromSearch}
     addAssetLoading={addAssetLoading}
     handleRemoveAsset={handleRemoveAsset}
     handleGenerateRecommendations={handleGenerateRecommendations}
     recsLoading={recsLoading}
     recsError={recsError}
     aiRecommendations={aiRecommendations}
+    handlePopulateSymbols={handlePopulateSymbols}
+    populateLoading={populateLoading}
+    populateSuccess={populateSuccess}
+    populateError={populateError}
     setHoveredCard={setHoveredCard}
     hoveredCard={hoveredCard}
   />;

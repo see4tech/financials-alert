@@ -17,11 +17,11 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen antialiased">
-        <LocaleProvider>
-          <SupabaseAuthProvider>
+        <SupabaseAuthProvider>
+          <LocaleProvider>
             <AuthRedirect>{children}</AuthRedirect>
-          </SupabaseAuthProvider>
-        </LocaleProvider>
+          </LocaleProvider>
+        </SupabaseAuthProvider>
       </body>
     </html>
   );

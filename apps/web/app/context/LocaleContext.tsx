@@ -3,6 +3,9 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import { en } from '@/lib/i18n/en';
 import { es, translateExplanation } from '@/lib/i18n/es';
+import { useSupabaseAuthReady } from '@/app/context/SupabaseAuthContext';
+import { getSupabaseBrowser } from '@/lib/supabase';
+import { getUserPreferences, saveUserPreferences } from '@/lib/api';
 
 export type Locale = 'es' | 'en';
 
@@ -45,11 +48,37 @@ const LocaleContext = React.createContext<LocaleContextValue | null>(null);
 export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('en');
   const [mounted, setMounted] = useState(false);
+  const [dbLoaded, setDbLoaded] = useState(false);
+  const clientReady = useSupabaseAuthReady();
 
+  // Initial mount: read from localStorage
   React.useEffect(() => {
     setLocaleState(getInitialLocale());
     setMounted(true);
   }, []);
+
+  // When Supabase auth is ready, load locale from DB (overrides localStorage if logged in)
+  React.useEffect(() => {
+    if (!clientReady || dbLoaded) return;
+    async function loadFromDb() {
+      const client = getSupabaseBrowser();
+      if (!client) return;
+      try {
+        const { data: { session } } = await client.auth.getSession();
+        if (!session?.access_token) return;
+        const prefs = await getUserPreferences(session.access_token);
+        if (prefs.locale === 'en' || prefs.locale === 'es') {
+          setLocaleState(prefs.locale);
+          if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, prefs.locale);
+        }
+      } catch {
+        // Ignore – use local preference
+      } finally {
+        setDbLoaded(true);
+      }
+    }
+    loadFromDb();
+  }, [clientReady, dbLoaded]);
 
   React.useEffect(() => {
     if (typeof document !== 'undefined') document.documentElement.lang = locale;
@@ -58,6 +87,18 @@ export function LocaleProvider({ children }: { children: React.ReactNode }) {
   const setLocale = useCallback((next: Locale) => {
     setLocaleState(next);
     if (typeof window !== 'undefined') localStorage.setItem(STORAGE_KEY, next);
+    // Also persist to DB if user is logged in
+    (async () => {
+      try {
+        const client = getSupabaseBrowser();
+        if (!client) return;
+        const { data: { session } } = await client.auth.getSession();
+        if (!session?.access_token) return;
+        await saveUserPreferences(session.access_token, { locale: next });
+      } catch {
+        // Ignore – localStorage is the fallback
+      }
+    })();
   }, []);
 
   const value = useMemo<LocaleContextValue>(() => {
