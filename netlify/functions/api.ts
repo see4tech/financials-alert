@@ -77,6 +77,18 @@ async function fetchPrice(symbol: string, assetType: string): Promise<number | n
   return Number.isNaN(n) ? null : n;
 }
 
+/** Wrapper around fetch with an AbortController timeout (ms). */
+async function fetchWithTimeout(url: string, init: RequestInit & { timeout?: number } = {}): Promise<Response> {
+  const { timeout = 8000, ...fetchInit } = init;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeout);
+  try {
+    return await fetch(url, { ...fetchInit, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ── Hardcoded commodity symbols for market scan ──
 const COMMODITY_SYMBOLS = [
   'CL', 'GC', 'NG', 'SI', 'HG', 'PL', 'PA', 'ZC', 'ZW', 'ZS',
@@ -244,7 +256,8 @@ async function fetchNasdaqScreener(
   // Try NASDAQ screener first
   try {
     const url = `https://api.nasdaq.com/api/screener/${tableType}?tableonly=true&limit=${limit}&offset=0`;
-    const res = await fetch(url, {
+    const res = await fetchWithTimeout(url, {
+      timeout: 6000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Accept: 'application/json, text/plain, */*',
@@ -310,7 +323,7 @@ async function fetchNasdaqScreener(
       try {
         const syms = chunk.map((s) => s.symbol).join(',');
         const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(syms)}&apikey=${twelveDataKey}`;
-        const res = await fetch(url);
+        const res = await fetchWithTimeout(url, { timeout: 6000 });
         if (!res.ok) return chunk.map((s) => ({ ...s, pct: 0, close: undefined as number | undefined, high52: undefined as number | undefined }));
         const data = (await res.json()) as Record<string, {
           symbol?: string; name?: string; percent_change?: string; close?: string;
@@ -361,10 +374,10 @@ async function fetchNasdaqScreener(
 }
 
 /** Fetch top crypto from CoinGecko. Free, no key. */
-async function fetchCoinGeckoTop(limit = 50): Promise<ScanCandidate[]> {
+async function fetchCoinGeckoTop(limit = 30): Promise<ScanCandidate[]> {
   try {
     const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${limit}&page=1&sparkline=false&price_change_percentage=7d`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, { timeout: 6000 });
     if (!res.ok) {
       console.warn(`[market-scan] CoinGecko ${res.status}`);
       return [];
@@ -399,7 +412,7 @@ async function fetchCommodityQuotes(apiKey: string): Promise<ScanCandidate[]> {
   try {
     const symbols = [...new Set(COMMODITY_SYMBOLS)].join(',');
     const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbols)}&apikey=${apiKey}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, { timeout: 6000 });
     if (!res.ok) {
       console.warn(`[market-scan] Twelve Data commodities ${res.status}`);
       return [];
@@ -439,7 +452,7 @@ async function fetchTwelveDataBatchQuotes(
   if (symbols.length === 0) return {};
   try {
     const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbols.join(','))}&apikey=${apiKey}`;
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, { timeout: 6000 });
     if (!res.ok) return {};
     const data = (await res.json()) as Record<
       string,
@@ -559,12 +572,12 @@ async function getMarketScanFromOpenAI(
     .join('\n');
   const prompt = `You are a financial assistant. Given the following market context and ${candidates.length} screening candidates, select the TOP ${count} best buying opportunities right now.
 
-For each pick provide: symbol, name, asset_type, action ("buy"), current_price, entry_price (suggested entry), take_profit, stop_loss, and a short reasoning (2–3 sentences).
+For each pick provide: symbol, name, asset_type, action ("buy"), current_price, entry_price (suggested entry), take_profit, stop_loss, and a brief reasoning (1–2 sentences) in BOTH English and Spanish.
 
 CRITICAL RULES:
-- current_price, entry_price, take_profit, and stop_loss MUST be numbers (e.g. 150.25). NEVER use text, strings, null, or "unknown". If the price is unknown, estimate a reasonable value based on the asset type and market context.
-- "reasoning" must be written in ${langName}.
-- Only the "reasoning" field should contain text. All price fields must be plain numbers with no currency symbols.
+- All price fields (current_price, entry_price, take_profit, stop_loss) MUST be numbers (e.g. 150.25). NEVER use text, null, or "unknown". Estimate if unknown.
+- Provide reasoning in BOTH languages: "reasoning_en" (English, 1-2 sentences) and "reasoning_es" (Spanish, 1-2 sentences).
+- Keep reasoning concise. No currency symbols in price fields.
 
 Market context:
 ${dashboardSummary}
@@ -572,9 +585,10 @@ ${dashboardSummary}
 Candidates:
 ${candidatesText}
 
-Respond with a JSON object containing a "picks" array of exactly ${count} objects, each with keys: symbol (string), name (string), asset_type (string), action (string "buy"), current_price (number), entry_price (number), take_profit (number), stop_loss (number), reasoning (string).`;
+Respond with a JSON object containing a "picks" array of exactly ${count} objects, each with keys: symbol (string), name (string), asset_type (string), action (string "buy"), current_price (number), entry_price (number), take_profit (number), stop_loss (number), reasoning_en (string in English), reasoning_es (string in Spanish).`;
 
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+    timeout: 22000,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -621,7 +635,8 @@ Respond with a JSON object containing a "picks" array of exactly ${count} object
     entry_price: toNum(item.entry_price),
     take_profit: toNum(item.take_profit),
     stop_loss: toNum(item.stop_loss),
-    reasoning: item.reasoning != null ? String(item.reasoning) : undefined,
+    reasoning_en: item.reasoning_en != null ? String(item.reasoning_en) : (item.reasoning != null ? String(item.reasoning) : undefined),
+    reasoning_es: item.reasoning_es != null ? String(item.reasoning_es) : (item.reasoning != null ? String(item.reasoning) : undefined),
   }));
 }
 
@@ -1040,13 +1055,15 @@ async function getApp(): Promise<express.Express> {
       console.log('[market-scan] locale:', userLocale, 'count:', count, 'assetTypes:', assetTypes);
 
       // Phase 1: Fetch screening data in parallel (only for requested asset types)
+      // Also fetch dashboard context in parallel to save time
       const twelveDataKey = process.env.TWELVE_DATA_API_KEY || '';
-      console.log('[market-scan] Phase 1: fetching screening data...');
-      const [stocks, etfs, crypto, commodities] = await Promise.all([
-        assetTypes.includes('stock') ? fetchNasdaqScreener('stocks', 200, twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
-        assetTypes.includes('etf') ? fetchNasdaqScreener('etf', 100, twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
-        assetTypes.includes('crypto') ? fetchCoinGeckoTop(50) : Promise.resolve([] as ScanCandidate[]),
+      console.log('[market-scan] Phase 1: fetching screening data + dashboard context...');
+      const [stocks, etfs, crypto, commodities, dashboard] = await Promise.all([
+        assetTypes.includes('stock') ? fetchNasdaqScreener('stocks', 100, twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('etf') ? fetchNasdaqScreener('etf', 50, twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('crypto') ? fetchCoinGeckoTop(30) : Promise.resolve([] as ScanCandidate[]),
         assetTypes.includes('commodity') && twelveDataKey ? fetchCommodityQuotes(twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
+        dashboardService.getToday('UTC'),
       ]);
       console.log(`[market-scan] Phase 1 results: stocks=${stocks.length}, etfs=${etfs.length}, crypto=${crypto.length}, commodities=${commodities.length}`);
 
@@ -1058,15 +1075,17 @@ async function getApp(): Promise<express.Express> {
       // Phase 2: Algorithmic scoring
       console.log('[market-scan] Phase 2: scoring...');
       scoreCandidates(allCandidates);
-      const top20 = pickTopCandidates(allCandidates, 20, 2);
-      console.log('[market-scan] Top 20 picked:', top20.map((c) => `${c.symbol}(${c.asset_type}:${c.score.toFixed(1)})`).join(', '));
+      // Pick slightly more than requested to give AI some choice, but not too many (to keep prompt small)
+      const pickCount = Math.min(count + 5, 20);
+      const topPicked = pickTopCandidates(allCandidates, pickCount, Math.min(2, Math.floor(count / 2)));
+      console.log('[market-scan] Top picked:', topPicked.map((c) => `${c.symbol}(${c.asset_type}:${c.score.toFixed(1)})`).join(', '));
 
-      // Phase 3: Fetch detailed quotes for non-crypto candidates from Twelve Data
-      const nonCryptoSymbols = top20.filter((c) => c.asset_type !== 'crypto').map((c) => c.symbol);
-      if (nonCryptoSymbols.length > 0 && twelveDataKey) {
-        console.log('[market-scan] Phase 3: fetching detailed quotes for', nonCryptoSymbols.length, 'symbols');
-        const quotes = await fetchTwelveDataBatchQuotes(nonCryptoSymbols, twelveDataKey);
-        for (const c of top20) {
+      // Phase 3: Fetch detailed quotes only for candidates missing price data
+      const needQuotes = topPicked.filter((c) => c.asset_type !== 'crypto' && c.current_price == null).map((c) => c.symbol);
+      if (needQuotes.length > 0 && twelveDataKey) {
+        console.log('[market-scan] Phase 3: fetching quotes for', needQuotes.length, 'symbols missing price data');
+        const quotes = await fetchTwelveDataBatchQuotes(needQuotes, twelveDataKey);
+        for (const c of topPicked) {
           const q = quotes[c.symbol];
           if (q) {
             if (q.close != null) c.current_price = q.close;
@@ -1076,18 +1095,17 @@ async function getApp(): Promise<express.Express> {
       }
 
       // Build dashboard context
-      const dashboard = await dashboardService.getToday('UTC');
       const indSummary = dashboard.indicators
         .map((i: { key: string; status: string; trend: string; value?: number | null }) => `${i.key}: ${i.status} (${i.trend}), value: ${i.value ?? 'n/a'}`)
         .join('\n');
       const dashboardSummary = `Score: ${dashboard.score}, Delta week: ${dashboard.deltaWeek}. Scenario: bull=${dashboard.scenario.bull}, bear=${dashboard.scenario.bear}.\nIndicators:\n${indSummary}`;
 
-      // Phase 3 (cont): AI refinement
-      console.log(`[market-scan] Phase 3: calling OpenAI for top ${count} picks...`);
+      // Phase 4: AI refinement
+      console.log(`[market-scan] Phase 4: calling OpenAI for top ${count} picks from ${topPicked.length} candidates...`);
       const scan = await getMarketScanFromOpenAI(
         llmRow.api_key,
         dashboardSummary,
-        top20.map((c) => ({
+        topPicked.map((c) => ({
           symbol: c.symbol,
           name: c.name,
           asset_type: c.asset_type,

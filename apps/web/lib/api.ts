@@ -172,6 +172,8 @@ export type MarketScanResult = {
   take_profit?: number;
   stop_loss?: number;
   reasoning?: string;
+  reasoning_en?: string;
+  reasoning_es?: string;
 };
 
 export async function fetchMarketScan(

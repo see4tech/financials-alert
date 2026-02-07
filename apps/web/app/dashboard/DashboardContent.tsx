@@ -507,6 +507,7 @@ export function DashboardContent(props: DashboardContentProps) {
       {activeTab === 'scanner' && (
         <ScannerSection
           t={t}
+          locale={locale}
           handleMarketScan={handleMarketScan}
           scanLoading={scanLoading}
           scanResults={scanResults}
@@ -533,6 +534,7 @@ const SCAN_COUNT_OPTIONS = [3, 5, 10, 15, 20] as const;
 
 function ScannerSection({
   t,
+  locale,
   handleMarketScan,
   scanLoading,
   scanResults,
@@ -540,6 +542,7 @@ function ScannerSection({
   hasLlmKey,
 }: {
   t: (key: string) => string;
+  locale: string;
   handleMarketScan: (count: number, assetTypes: string[]) => void;
   scanLoading: boolean;
   scanResults: MarketScanResult[] | null;
@@ -681,7 +684,10 @@ function ScannerSection({
                     </div>
                   )}
                 </dl>
-                {item.reasoning && <p className="text-xs text-gray-600 mt-2 border-t border-gray-100 pt-2">{item.reasoning}</p>}
+                {(() => {
+                  const reason = (locale === 'es' ? item.reasoning_es : item.reasoning_en) || item.reasoning_en || item.reasoning_es || item.reasoning;
+                  return reason ? <p className="text-xs text-gray-600 mt-2 border-t border-gray-100 pt-2">{reason}</p> : null;
+                })()}
               </div>
             );
           })}
