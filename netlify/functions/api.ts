@@ -422,14 +422,20 @@ async function getApp(): Promise<express.Express> {
         return res.status(400).json({ error: 'Configure your AI provider and API key in Settings first.' });
       }
       console.log('[recommendations] provider:', llmRow.provider, 'apiKey length:', llmRow.api_key?.length);
-      // Read user locale preference
-      const { data: prefRow } = await supabase
-        .from('user_preferences')
-        .select('locale')
-        .eq('user_id', userId)
-        .maybeSingle();
-      const userLocale = (prefRow?.locale as string) || 'en';
-      console.log('[recommendations] userLocale:', userLocale);
+      // Read locale: prefer value sent by client, fallback to DB preference, then 'en'
+      const bodyLocale = req.body?.locale;
+      let userLocale = 'en';
+      if (typeof bodyLocale === 'string' && ['en', 'es'].includes(bodyLocale)) {
+        userLocale = bodyLocale;
+      } else {
+        const { data: prefRow } = await supabase
+          .from('user_preferences')
+          .select('locale')
+          .eq('user_id', userId)
+          .maybeSingle();
+        userLocale = (prefRow?.locale as string) || 'en';
+      }
+      console.log('[recommendations] userLocale:', userLocale, '(source:', typeof bodyLocale === 'string' ? 'request body' : 'DB/default', ')');
       const dashboard = await dashboardService.getToday('UTC');
       const indSummary = dashboard.indicators.map((i: { key: string; status: string; trend: string; value?: number | null }) => `${i.key}: ${i.status} (${i.trend}), value: ${i.value ?? 'n/a'}`).join('\n');
       const dashboardSummary = `Score: ${dashboard.score}, Delta week: ${dashboard.deltaWeek}. Scenario: bull=${dashboard.scenario.bull}, bear=${dashboard.scenario.bear}.\nIndicators:\n${indSummary}`;

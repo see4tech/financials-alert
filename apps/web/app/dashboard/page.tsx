@@ -184,7 +184,7 @@ export default function DashboardPage() {
     setRecsLoading(true);
     setAiRecommendations(null);
     try {
-      const result = await fetchRecommendations(session.access_token);
+      const result = await fetchRecommendations(session.access_token, locale);
       console.log('[recommendations] raw response:', JSON.stringify(result));
       const recs = result.recommendations || [];
       setAiRecommendations(recs);
@@ -197,7 +197,7 @@ export default function DashboardPage() {
     } finally {
       setRecsLoading(false);
     }
-  }, []);
+  }, [locale]);
 
   if (loading) return <div className="p-8">{t('common.loading')}</div>;
   if (error) {

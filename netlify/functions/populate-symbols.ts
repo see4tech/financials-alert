@@ -67,17 +67,20 @@ export const handler: Handler = async (event) => {
     const twelveDataKey = process.env.TWELVE_DATA_API_KEY;
     const results: Record<string, number> = {};
 
-    // ── 1. Stocks from Twelve Data (US exchanges) ──
+    // ── 1. Stocks from Twelve Data (US only, no exchange filter) ──
     if (twelveDataKey) {
       try {
         console.log('[populate] Fetching stocks from Twelve Data…');
         const res = await fetch(
-          `https://api.twelvedata.com/stocks?exchange=NYSE,NASDAQ&country=United+States&apikey=${twelveDataKey}`,
+          `https://api.twelvedata.com/stocks?country=United+States&apikey=${twelveDataKey}`,
         );
         if (res.ok) {
           const json = (await res.json()) as {
             data?: Array<{ symbol: string; name: string; exchange: string; type: string }>;
           };
+          if (!json.data || json.data.length === 0) {
+            console.warn('[populate] /stocks returned empty data. Status:', res.status, 'snippet:', JSON.stringify(json).slice(0, 300));
+          }
           const rows = (json.data || []).map((s) => ({
             symbol: s.symbol,
             name: s.name,
@@ -87,26 +90,30 @@ export const handler: Handler = async (event) => {
           console.log(`[populate] ${rows.length} stocks fetched, upserting…`);
           results.stocks = await batchUpsert(supabase, rows);
         } else {
-          console.error('[populate] Twelve Data /stocks status:', res.status);
+          const body = await res.text().catch(() => '');
+          console.error('[populate] Twelve Data /stocks status:', res.status, 'body:', body.slice(0, 300));
         }
       } catch (e) {
         console.error('[populate] stocks error:', e);
       }
     } else {
-      console.warn('[populate] TWELVE_DATA_API_KEY not set – skipping stocks & ETFs');
+      console.warn('[populate] TWELVE_DATA_API_KEY not set – skipping stocks & ETFs & commodities from Twelve Data');
     }
 
-    // ── 2. ETFs from Twelve Data ──
+    // ── 2. ETFs from Twelve Data (US only, no exchange filter) ──
     if (twelveDataKey) {
       try {
         console.log('[populate] Fetching ETFs from Twelve Data…');
         const res = await fetch(
-          `https://api.twelvedata.com/etf?exchange=NYSE,NASDAQ&country=United+States&apikey=${twelveDataKey}`,
+          `https://api.twelvedata.com/etf?country=United+States&apikey=${twelveDataKey}`,
         );
         if (res.ok) {
           const json = (await res.json()) as {
             data?: Array<{ symbol: string; name: string; exchange: string }>;
           };
+          if (!json.data || json.data.length === 0) {
+            console.warn('[populate] /etf returned empty data. Status:', res.status, 'snippet:', JSON.stringify(json).slice(0, 300));
+          }
           const rows = (json.data || []).map((s) => ({
             symbol: s.symbol,
             name: s.name,
@@ -116,22 +123,56 @@ export const handler: Handler = async (event) => {
           console.log(`[populate] ${rows.length} ETFs fetched, upserting…`);
           results.etfs = await batchUpsert(supabase, rows);
         } else {
-          console.error('[populate] Twelve Data /etf status:', res.status);
+          const body = await res.text().catch(() => '');
+          console.error('[populate] Twelve Data /etf status:', res.status, 'body:', body.slice(0, 300));
         }
       } catch (e) {
         console.error('[populate] ETF error:', e);
       }
     }
 
-    // ── 3. Commodities (hardcoded) ──
+    // ── 3. Commodities – Twelve Data dynamic list + hardcoded fallback ──
     try {
-      const rows = COMMODITIES.map((c) => ({
-        symbol: c.symbol,
-        name: c.name,
-        asset_type: 'commodity' as const,
-        exchange: c.exchange,
-      }));
-      results.commodities = await batchUpsert(supabase, rows);
+      const dynamicRows: Array<{ symbol: string; name: string; asset_type: 'commodity'; exchange: string | null }> = [];
+      if (twelveDataKey) {
+        try {
+          console.log('[populate] Fetching commodities from Twelve Data…');
+          const res = await fetch(
+            `https://api.twelvedata.com/commodities?apikey=${twelveDataKey}`,
+          );
+          if (res.ok) {
+            const json = (await res.json()) as {
+              data?: Array<{ symbol: string; name: string; exchange?: string }>;
+            };
+            if (!json.data || json.data.length === 0) {
+              console.warn('[populate] /commodities returned empty data. snippet:', JSON.stringify(json).slice(0, 300));
+            }
+            for (const c of json.data || []) {
+              dynamicRows.push({
+                symbol: c.symbol,
+                name: c.name,
+                asset_type: 'commodity',
+                exchange: c.exchange || 'COMMODITY',
+              });
+            }
+            console.log(`[populate] ${dynamicRows.length} commodities fetched from Twelve Data`);
+          } else {
+            const body = await res.text().catch(() => '');
+            console.warn('[populate] Twelve Data /commodities status:', res.status, 'body:', body.slice(0, 300));
+          }
+        } catch (e) {
+          console.warn('[populate] Twelve Data commodities error (falling back to hardcoded):', e);
+        }
+      }
+      // Merge: start with dynamic, add any hardcoded symbols not already present
+      const seenSymbols = new Set(dynamicRows.map((r) => r.symbol));
+      for (const c of COMMODITIES) {
+        if (!seenSymbols.has(c.symbol)) {
+          dynamicRows.push({ symbol: c.symbol, name: c.name, asset_type: 'commodity', exchange: c.exchange });
+        }
+      }
+      console.log(`[populate] ${dynamicRows.length} total commodities (dynamic + hardcoded), upserting…`);
+      results.commodities = await batchUpsert(supabase, dynamicRows);
     } catch (e) {
       console.error('[populate] commodity error:', e);
     }

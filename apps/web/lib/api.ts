@@ -143,11 +143,11 @@ export type AiRecommendation = {
   reasoning?: string;
 };
 
-export async function fetchRecommendations(accessToken: string): Promise<{ recommendations: AiRecommendation[] }> {
+export async function fetchRecommendations(accessToken: string, locale = 'en'): Promise<{ recommendations: AiRecommendation[] }> {
   const res = await fetch(`${API_BASE}/api/recommendations`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({}),
+    body: JSON.stringify({ locale }),
   });
   await throwOnNotOk(res);
   const text = await res.text();
