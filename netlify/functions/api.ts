@@ -80,7 +80,84 @@ async function fetchPrice(symbol: string, assetType: string): Promise<number | n
 // ── Hardcoded commodity symbols for market scan ──
 const COMMODITY_SYMBOLS = [
   'CL', 'GC', 'NG', 'SI', 'HG', 'PL', 'PA', 'ZC', 'ZW', 'ZS',
-  'KC', 'CT', 'SB', 'CC', 'LBS', 'LE', 'HE', 'OJ', 'RB', 'HO', 'BZ', 'NG',
+  'KC', 'CT', 'SB', 'CC', 'LBS', 'LE', 'HE', 'OJ', 'RB', 'HO', 'BZ',
+];
+
+// ── Fallback popular symbols when NASDAQ screener is unavailable ──
+const FALLBACK_STOCKS: { symbol: string; name: string }[] = [
+  { symbol: 'AAPL', name: 'Apple Inc.' },
+  { symbol: 'MSFT', name: 'Microsoft Corporation' },
+  { symbol: 'NVDA', name: 'NVIDIA Corporation' },
+  { symbol: 'GOOGL', name: 'Alphabet Inc.' },
+  { symbol: 'AMZN', name: 'Amazon.com Inc.' },
+  { symbol: 'META', name: 'Meta Platforms Inc.' },
+  { symbol: 'TSLA', name: 'Tesla Inc.' },
+  { symbol: 'BRK.B', name: 'Berkshire Hathaway Inc.' },
+  { symbol: 'JPM', name: 'JPMorgan Chase & Co.' },
+  { symbol: 'V', name: 'Visa Inc.' },
+  { symbol: 'JNJ', name: 'Johnson & Johnson' },
+  { symbol: 'WMT', name: 'Walmart Inc.' },
+  { symbol: 'MA', name: 'Mastercard Inc.' },
+  { symbol: 'PG', name: 'Procter & Gamble Co.' },
+  { symbol: 'UNH', name: 'UnitedHealth Group Inc.' },
+  { symbol: 'HD', name: 'The Home Depot Inc.' },
+  { symbol: 'XOM', name: 'Exxon Mobil Corporation' },
+  { symbol: 'COST', name: 'Costco Wholesale Corporation' },
+  { symbol: 'ABBV', name: 'AbbVie Inc.' },
+  { symbol: 'CRM', name: 'Salesforce Inc.' },
+  { symbol: 'AMD', name: 'Advanced Micro Devices Inc.' },
+  { symbol: 'NFLX', name: 'Netflix Inc.' },
+  { symbol: 'LLY', name: 'Eli Lilly and Company' },
+  { symbol: 'AVGO', name: 'Broadcom Inc.' },
+  { symbol: 'ADBE', name: 'Adobe Inc.' },
+  { symbol: 'PEP', name: 'PepsiCo Inc.' },
+  { symbol: 'KO', name: 'The Coca-Cola Company' },
+  { symbol: 'MRK', name: 'Merck & Co. Inc.' },
+  { symbol: 'TMO', name: 'Thermo Fisher Scientific Inc.' },
+  { symbol: 'CSCO', name: 'Cisco Systems Inc.' },
+  { symbol: 'ACN', name: 'Accenture plc' },
+  { symbol: 'ORCL', name: 'Oracle Corporation' },
+  { symbol: 'ABT', name: 'Abbott Laboratories' },
+  { symbol: 'DIS', name: 'The Walt Disney Company' },
+  { symbol: 'INTC', name: 'Intel Corporation' },
+  { symbol: 'QCOM', name: 'QUALCOMM Inc.' },
+  { symbol: 'CMCSA', name: 'Comcast Corporation' },
+  { symbol: 'NKE', name: 'NIKE Inc.' },
+  { symbol: 'BA', name: 'The Boeing Company' },
+  { symbol: 'GS', name: 'The Goldman Sachs Group Inc.' },
+];
+
+const FALLBACK_ETFS: { symbol: string; name: string }[] = [
+  { symbol: 'SPY', name: 'SPDR S&P 500 ETF Trust' },
+  { symbol: 'QQQ', name: 'Invesco QQQ Trust' },
+  { symbol: 'IWM', name: 'iShares Russell 2000 ETF' },
+  { symbol: 'DIA', name: 'SPDR Dow Jones Industrial Average ETF' },
+  { symbol: 'VTI', name: 'Vanguard Total Stock Market ETF' },
+  { symbol: 'VOO', name: 'Vanguard S&P 500 ETF' },
+  { symbol: 'EFA', name: 'iShares MSCI EAFE ETF' },
+  { symbol: 'EEM', name: 'iShares MSCI Emerging Markets ETF' },
+  { symbol: 'VEA', name: 'Vanguard FTSE Developed Markets ETF' },
+  { symbol: 'VWO', name: 'Vanguard FTSE Emerging Markets ETF' },
+  { symbol: 'XLF', name: 'Financial Select Sector SPDR Fund' },
+  { symbol: 'XLK', name: 'Technology Select Sector SPDR Fund' },
+  { symbol: 'XLE', name: 'Energy Select Sector SPDR Fund' },
+  { symbol: 'XLV', name: 'Health Care Select Sector SPDR Fund' },
+  { symbol: 'XLI', name: 'Industrial Select Sector SPDR Fund' },
+  { symbol: 'XLP', name: 'Consumer Staples Select Sector SPDR Fund' },
+  { symbol: 'XLY', name: 'Consumer Discretionary Select Sector SPDR Fund' },
+  { symbol: 'XLU', name: 'Utilities Select Sector SPDR Fund' },
+  { symbol: 'ARKK', name: 'ARK Innovation ETF' },
+  { symbol: 'GLD', name: 'SPDR Gold Shares' },
+  { symbol: 'SLV', name: 'iShares Silver Trust' },
+  { symbol: 'TLT', name: 'iShares 20+ Year Treasury Bond ETF' },
+  { symbol: 'HYG', name: 'iShares iBoxx $ High Yield Corporate Bond ETF' },
+  { symbol: 'LQD', name: 'iShares iBoxx $ Investment Grade Corporate Bond ETF' },
+  { symbol: 'VNQ', name: 'Vanguard Real Estate ETF' },
+  { symbol: 'SOXX', name: 'iShares Semiconductor ETF' },
+  { symbol: 'SMH', name: 'VanEck Semiconductor ETF' },
+  { symbol: 'KWEB', name: 'KraneShares CSI China Internet ETF' },
+  { symbol: 'IBB', name: 'iShares Biotechnology ETF' },
+  { symbol: 'XBI', name: 'SPDR S&P Biotech ETF' },
 ];
 
 const LOCALE_NAMES: Record<string, string> = { en: 'English', es: 'Spanish' };
@@ -157,43 +234,130 @@ type ScanCandidate = {
   fifty_two_week_high?: number;
 };
 
-/** Fetch NASDAQ screener (stocks or etf). Free, no API key needed. */
+/** Fetch NASDAQ screener (stocks or etf). Free, no API key needed.
+ *  Falls back to curated list + Twelve Data quotes when NASDAQ blocks the request. */
 async function fetchNasdaqScreener(
   tableType: 'stocks' | 'etf',
   limit: number,
+  twelveDataKey?: string,
 ): Promise<ScanCandidate[]> {
+  // Try NASDAQ screener first
   try {
     const url = `https://api.nasdaq.com/api/screener/${tableType}?tableonly=true&limit=${limit}&offset=0`;
     const res = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0',
-        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        Accept: 'application/json, text/plain, */*',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate, br',
+        Referer: 'https://www.nasdaq.com/',
+        Origin: 'https://www.nasdaq.com',
       },
     });
-    if (!res.ok) {
-      console.warn(`[market-scan] NASDAQ screener ${tableType} ${res.status}`);
-      return [];
+    if (res.ok) {
+      const json = (await res.json()) as {
+        data?: { table?: { rows?: Array<{ symbol?: string; name?: string; pctchange?: string; marketCap?: string; volume?: string }> } };
+      };
+      const rows = json?.data?.table?.rows ?? [];
+      if (rows.length > 0) {
+        console.log(`[market-scan] NASDAQ screener ${tableType}: ${rows.length} rows`);
+        return rows
+          .filter((r) => r.symbol && r.name)
+          .map((r) => {
+            const pct = parseFloat(String(r.pctchange ?? '0').replace(/[%,]/g, '')) || 0;
+            return {
+              symbol: r.symbol!.trim(),
+              name: r.name!.trim(),
+              asset_type: tableType === 'etf' ? 'etf' : 'stock',
+              pct_change: pct,
+              score: 0,
+            };
+          });
+      }
+    } else {
+      console.warn(`[market-scan] NASDAQ screener ${tableType} returned ${res.status}, using fallback`);
     }
-    const json = (await res.json()) as {
-      data?: { table?: { rows?: Array<{ symbol?: string; name?: string; pctchange?: string; marketCap?: string; volume?: string }> } };
-    };
-    const rows = json?.data?.table?.rows ?? [];
-    return rows
-      .filter((r) => r.symbol && r.name)
-      .map((r) => {
-        const pct = parseFloat(String(r.pctchange ?? '0').replace(/[%,]/g, '')) || 0;
-        return {
-          symbol: r.symbol!.trim(),
-          name: r.name!.trim(),
-          asset_type: tableType === 'etf' ? 'etf' : 'stock',
-          pct_change: pct,
-          score: 0,
-        };
-      });
   } catch (e) {
-    console.warn(`[market-scan] NASDAQ screener error (${tableType}):`, e);
-    return [];
+    console.warn(`[market-scan] NASDAQ screener ${tableType} failed, using fallback:`, e instanceof Error ? e.message : e);
   }
+
+  // Fallback: use curated list + Twelve Data batch quotes
+  const fallbackList = tableType === 'etf' ? FALLBACK_ETFS : FALLBACK_STOCKS;
+  const assetType = tableType === 'etf' ? 'etf' : 'stock';
+
+  if (!twelveDataKey) {
+    // No API key: return the list without price data (scoring will still work but less accurately)
+    console.log(`[market-scan] Fallback ${tableType}: ${fallbackList.length} symbols (no Twelve Data key for quotes)`);
+    return fallbackList.map((s) => ({
+      symbol: s.symbol,
+      name: s.name,
+      asset_type: assetType,
+      pct_change: 0,
+      score: 0,
+    }));
+  }
+
+  // Batch quote from Twelve Data in chunks of 8 (API limit per call)
+  console.log(`[market-scan] Fallback ${tableType}: quoting ${fallbackList.length} symbols via Twelve Data`);
+  const candidates: ScanCandidate[] = [];
+  const chunks: typeof fallbackList[] = [];
+  for (let i = 0; i < fallbackList.length; i += 8) {
+    chunks.push(fallbackList.slice(i, i + 8));
+  }
+
+  const chunkResults = await Promise.all(
+    chunks.map(async (chunk) => {
+      try {
+        const syms = chunk.map((s) => s.symbol).join(',');
+        const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(syms)}&apikey=${twelveDataKey}`;
+        const res = await fetch(url);
+        if (!res.ok) return chunk.map((s) => ({ ...s, pct: 0, close: undefined as number | undefined, high52: undefined as number | undefined }));
+        const data = (await res.json()) as Record<string, {
+          symbol?: string; name?: string; percent_change?: string; close?: string;
+          fifty_two_week?: { high?: string };
+        }>;
+        // Single symbol: flat. Multiple: keyed by symbol.
+        if (chunk.length === 1 && data.symbol && typeof data.symbol === 'string') {
+          const d = data as unknown as { symbol: string; name?: string; percent_change?: string; close?: string; fifty_two_week?: { high?: string } };
+          return [{
+            symbol: d.symbol, name: d.name ?? chunk[0].name,
+            pct: parseFloat(String(d.percent_change ?? '0')) || 0,
+            close: d.close ? parseFloat(d.close) || undefined : undefined,
+            high52: d.fifty_two_week?.high ? parseFloat(d.fifty_two_week.high) || undefined : undefined,
+          }];
+        }
+        return chunk.map((s) => {
+          const q = data[s.symbol];
+          if (!q) return { ...s, pct: 0, close: undefined as number | undefined, high52: undefined as number | undefined };
+          return {
+            symbol: s.symbol, name: q.name ?? s.name,
+            pct: parseFloat(String(q.percent_change ?? '0')) || 0,
+            close: q.close ? parseFloat(q.close) || undefined : undefined,
+            high52: q.fifty_two_week?.high ? parseFloat(q.fifty_two_week.high) || undefined : undefined,
+          };
+        });
+      } catch {
+        return chunk.map((s) => ({ ...s, pct: 0, close: undefined as number | undefined, high52: undefined as number | undefined }));
+      }
+    }),
+  );
+
+  for (const results of chunkResults) {
+    for (const r of results) {
+      candidates.push({
+        symbol: r.symbol,
+        name: r.name,
+        asset_type: assetType,
+        pct_change: r.pct,
+        score: 0,
+        current_price: r.close,
+        fifty_two_week_high: r.high52,
+      });
+    }
+  }
+
+  console.log(`[market-scan] Fallback ${tableType}: got ${candidates.length} candidates with quotes`);
+  return candidates;
 }
 
 /** Fetch top crypto from CoinGecko. Free, no key. */
@@ -395,9 +559,12 @@ async function getMarketScanFromOpenAI(
     .join('\n');
   const prompt = `You are a financial assistant. Given the following market context and ${candidates.length} screening candidates, select the TOP ${count} best buying opportunities right now.
 
-For each pick provide: symbol, name, asset_type, action ("buy"), entry_price (suggested entry), take_profit, stop_loss, and a short reasoning (2–3 sentences).
+For each pick provide: symbol, name, asset_type, action ("buy"), current_price, entry_price (suggested entry), take_profit, stop_loss, and a short reasoning (2–3 sentences).
 
-IMPORTANT: Write the "reasoning" field and all text in ${langName}.
+CRITICAL RULES:
+- current_price, entry_price, take_profit, and stop_loss MUST be numbers (e.g. 150.25). NEVER use text, strings, null, or "unknown". If the price is unknown, estimate a reasonable value based on the asset type and market context.
+- "reasoning" must be written in ${langName}.
+- Only the "reasoning" field should contain text. All price fields must be plain numbers with no currency symbols.
 
 Market context:
 ${dashboardSummary}
@@ -405,7 +572,7 @@ ${dashboardSummary}
 Candidates:
 ${candidatesText}
 
-Respond with a JSON object containing a "picks" array of exactly ${count} objects, each with keys: symbol, name, asset_type, action, current_price, entry_price, take_profit, stop_loss, reasoning.`;
+Respond with a JSON object containing a "picks" array of exactly ${count} objects, each with keys: symbol (string), name (string), asset_type (string), action (string "buy"), current_price (number), entry_price (number), take_profit (number), stop_loss (number), reasoning (string).`;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -438,17 +605,24 @@ Respond with a JSON object containing a "picks" array of exactly ${count} object
       }
     }
   }
-  return list as Array<{
-    symbol: string;
-    name: string;
-    asset_type: string;
-    action: string;
-    current_price?: number;
-    entry_price?: number;
-    take_profit?: number;
-    stop_loss?: number;
-    reasoning?: string;
-  }>;
+  // Sanitise: coerce price fields to numbers (the LLM sometimes returns strings or text)
+  const toNum = (v: unknown): number | undefined => {
+    if (v == null) return undefined;
+    const n = typeof v === 'number' ? v : parseFloat(String(v));
+    return Number.isFinite(n) ? n : undefined;
+  };
+
+  return (list as Array<Record<string, unknown>>).map((item) => ({
+    symbol: String(item.symbol ?? ''),
+    name: String(item.name ?? ''),
+    asset_type: String(item.asset_type ?? ''),
+    action: String(item.action ?? 'buy'),
+    current_price: toNum(item.current_price),
+    entry_price: toNum(item.entry_price),
+    take_profit: toNum(item.take_profit),
+    stop_loss: toNum(item.stop_loss),
+    reasoning: item.reasoning != null ? String(item.reasoning) : undefined,
+  }));
 }
 
 let app: express.Express | null = null;
@@ -869,8 +1043,8 @@ async function getApp(): Promise<express.Express> {
       const twelveDataKey = process.env.TWELVE_DATA_API_KEY || '';
       console.log('[market-scan] Phase 1: fetching screening data...');
       const [stocks, etfs, crypto, commodities] = await Promise.all([
-        assetTypes.includes('stock') ? fetchNasdaqScreener('stocks', 200) : Promise.resolve([] as ScanCandidate[]),
-        assetTypes.includes('etf') ? fetchNasdaqScreener('etf', 100) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('stock') ? fetchNasdaqScreener('stocks', 200, twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('etf') ? fetchNasdaqScreener('etf', 100, twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
         assetTypes.includes('crypto') ? fetchCoinGeckoTop(50) : Promise.resolve([] as ScanCandidate[]),
         assetTypes.includes('commodity') && twelveDataKey ? fetchCommodityQuotes(twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
       ]);

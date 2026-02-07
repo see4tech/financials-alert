@@ -518,6 +518,15 @@ export function DashboardContent(props: DashboardContentProps) {
   );
 }
 
+// ── Helpers ──
+/** Returns a formatted price string only if the value is a real number, otherwise null. */
+function fmtPrice(v: unknown): string | null {
+  if (v == null) return null;
+  const n = typeof v === 'number' ? v : parseFloat(String(v));
+  if (Number.isNaN(n) || !Number.isFinite(n)) return null;
+  return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
 // ── Market Scanner sub-component with local state for count & asset type filter ──
 const ALL_ASSET_TYPES = ['stock', 'etf', 'commodity', 'crypto'] as const;
 const SCAN_COUNT_OPTIONS = [3, 5, 10, 15, 20] as const;
@@ -646,29 +655,29 @@ function ScannerSection({
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 mb-2 truncate">{item.name}</p>
-                {item.current_price != null && (
+                {fmtPrice(item.current_price) && (
                   <p className="text-sm mb-1">
                     <span className="font-medium text-gray-700">{t('dashboard.currentPrice')}:</span>{' '}
-                    <span className="text-gray-900">${typeof item.current_price === 'number' ? item.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.current_price}</span>
+                    <span className="text-gray-900">${fmtPrice(item.current_price)}</span>
                   </p>
                 )}
                 <dl className="text-sm space-y-0.5">
-                  {item.entry_price != null && (
+                  {fmtPrice(item.entry_price) && (
                     <div>
                       <dt className="inline font-medium text-gray-700">{t('dashboard.entryPrice')}:</dt>{' '}
-                      <dd className="inline">${item.entry_price}</dd>
+                      <dd className="inline">${fmtPrice(item.entry_price)}</dd>
                     </div>
                   )}
-                  {item.take_profit != null && (
+                  {fmtPrice(item.take_profit) && (
                     <div>
                       <dt className="inline font-medium text-green-700">{t('dashboard.takeProfit')}:</dt>{' '}
-                      <dd className="inline text-green-700">${item.take_profit}</dd>
+                      <dd className="inline text-green-700">${fmtPrice(item.take_profit)}</dd>
                     </div>
                   )}
-                  {item.stop_loss != null && (
+                  {fmtPrice(item.stop_loss) && (
                     <div>
                       <dt className="inline font-medium text-red-700">{t('dashboard.stopLoss')}:</dt>{' '}
-                      <dd className="inline text-red-700">${item.stop_loss}</dd>
+                      <dd className="inline text-red-700">${fmtPrice(item.stop_loss)}</dd>
                     </div>
                   )}
                 </dl>
