@@ -379,11 +379,15 @@ export function DashboardContent(props: DashboardContentProps) {
           {/* Action row */}
           {userAssets.length > 0 && (
             <div className="flex items-start gap-6 mb-6">
-              <button type="button" onClick={handleGenerateRecommendations} disabled={recsLoading} className="cb-action-btn group">
-                <span className="cb-action-circle bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-900/60 group-disabled:opacity-50">
-                  <SparkleIcon />
+              <button type="button" onClick={handleGenerateRecommendations} disabled={recsLoading} className="cb-action-btn group disabled:pointer-events-none">
+                <span className={`cb-action-circle transition-colors ${recsLoading ? 'bg-indigo-200 dark:bg-indigo-800/50 text-indigo-400 dark:text-indigo-500 animate-pulse' : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/40 dark:text-indigo-400 group-hover:bg-indigo-200 dark:group-hover:bg-indigo-900/60'}`}>
+                  {recsLoading ? (
+                    <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
+                  ) : (
+                    <SparkleIcon />
+                  )}
                 </span>
-                <span className="cb-action-label">{recsLoading ? '...' : t('dashboard.generateRecommendations')}</span>
+                <span className={`cb-action-label ${recsLoading ? 'text-slate-400 dark:text-slate-500' : ''}`}>{recsLoading ? t('common.loading') : t('dashboard.generateRecommendations')}</span>
               </button>
             </div>
           )}
