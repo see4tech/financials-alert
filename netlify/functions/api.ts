@@ -272,17 +272,60 @@ async function getApp(): Promise<express.Express> {
   });
 
   // ── Symbol search (public – no auth required) ──
+  // Uses direct queries instead of RPC to avoid stale function definitions.
+  // Priority: exact symbol > symbol prefix > symbol contains > name contains.
   app.get('/api/symbols/search', async (req: Request, res: Response) => {
     try {
       const q = ((req.query.q as string) || '').trim();
       if (q.length < 1) return res.json({ results: [] });
       const supabase = getSupabaseService();
-      const { data, error } = await supabase.rpc('search_symbols', { q, lim: 20 });
-      if (error) {
-        console.error('/api/symbols/search', error);
-        return res.status(500).json({ error: errorMessage(error) });
+      const qUp = q.toUpperCase();
+      const seen = new Set<string>();
+      const merged: Array<{ symbol: string; name: string; asset_type: string; exchange: string | null }> = [];
+
+      const addRows = (rows: typeof merged) => {
+        for (const r of rows) {
+          const key = r.symbol + ':' + r.asset_type;
+          if (!seen.has(key)) {
+            seen.add(key);
+            merged.push(r);
+          }
+        }
+      };
+
+      // 1. Exact symbol match
+      const { data: exact } = await supabase
+        .from('symbols')
+        .select('symbol, name, asset_type, exchange')
+        .ilike('symbol', q)
+        .limit(5);
+      addRows(exact || []);
+
+      // 2. Symbol starts with query
+      const { data: prefix } = await supabase
+        .from('symbols')
+        .select('symbol, name, asset_type, exchange')
+        .ilike('symbol', `${q}%`)
+        .limit(10);
+      addRows(prefix || []);
+
+      // 3. Symbol or name contains query (broader match)
+      if (merged.length < 20) {
+        const { data: broad } = await supabase
+          .from('symbols')
+          .select('symbol, name, asset_type, exchange')
+          .or(`symbol.ilike.%${q}%,name.ilike.%${q}%`)
+          .limit(30);
+        // Sort broad: symbol-contains first, then name-only
+        const sorted = (broad || []).sort((a, b) => {
+          const aSymMatch = a.symbol.toUpperCase().includes(qUp) ? 0 : 1;
+          const bSymMatch = b.symbol.toUpperCase().includes(qUp) ? 0 : 1;
+          return aSymMatch - bSymMatch;
+        });
+        addRows(sorted);
       }
-      return res.json({ results: data || [] });
+
+      return res.json({ results: merged.slice(0, 20) });
     } catch (e) {
       console.error('/api/symbols/search', e);
       return res.status(500).json({ error: errorMessage(e) });

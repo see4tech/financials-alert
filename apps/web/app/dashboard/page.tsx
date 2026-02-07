@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from '@/app/context/LocaleContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
-import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, type AiRecommendation } from '@/lib/api';
+import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, fetchRecommendations, getLlmSettings, type AiRecommendation } from '@/lib/api';
 import { DashboardContent } from './DashboardContent';
 import { DashboardErrorView } from './DashboardErrorView';
 
@@ -43,9 +43,7 @@ export default function DashboardPage() {
   const [recsLoading, setRecsLoading] = useState(false);
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[] | null>(null);
   const [recsError, setRecsError] = useState<string | null>(null);
-  const [populateLoading, setPopulateLoading] = useState(false);
-  const [populateSuccess, setPopulateSuccess] = useState<string | null>(null);
-  const [populateError, setPopulateError] = useState<string | null>(null);
+  const [hasLlmKey, setHasLlmKey] = useState(false);
 
   const statusIconColor = useCallback((s: string): string =>
     s === 'GREEN' ? 'text-green-600' : s === 'RED' ? 'text-red-600' : s === 'YELLOW' ? 'text-amber-500' : 'text-gray-400', []);
@@ -69,6 +67,18 @@ export default function DashboardPage() {
   useEffect(() => {
     loadUserAssets();
   }, [loadUserAssets]);
+
+  // Check if user has an LLM API key configured
+  useEffect(() => {
+    const client = getSupabaseBrowser();
+    if (!client) return;
+    client.auth.getSession().then(({ data: { session } }) => {
+      if (!session?.access_token) return;
+      getLlmSettings(session.access_token)
+        .then((s) => setHasLlmKey(s.hasKey))
+        .catch(() => {});
+    });
+  }, []);
 
   useEffect(() => {
     refreshData()
@@ -145,28 +155,6 @@ export default function DashboardPage() {
       setAddAssetLoading(false);
     }
   }, [loadUserAssets]);
-
-  const handlePopulateSymbols = useCallback(async () => {
-    setPopulateError(null);
-    setPopulateSuccess(null);
-    setPopulateLoading(true);
-    try {
-      const res = await triggerPopulateSymbols(cronSecretInput.trim() || undefined);
-      const parts: string[] = [];
-      if (res.results) {
-        for (const [k, v] of Object.entries(res.results)) {
-          parts.push(`${k}: ${v}`);
-        }
-      }
-      setPopulateSuccess(t('dashboard.populateSuccess') + (parts.length > 0 ? ` (${parts.join(', ')})` : ''));
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      if (msg.includes('Cron secret required')) setCronSecretPrompt(true);
-      else setPopulateError(msg);
-    } finally {
-      setPopulateLoading(false);
-    }
-  }, [cronSecretInput, t]);
 
   const handleRemoveAsset = useCallback(async (id: string) => {
     const client = getSupabaseBrowser();
@@ -247,10 +235,7 @@ export default function DashboardPage() {
     recsLoading={recsLoading}
     recsError={recsError}
     aiRecommendations={aiRecommendations}
-    handlePopulateSymbols={handlePopulateSymbols}
-    populateLoading={populateLoading}
-    populateSuccess={populateSuccess}
-    populateError={populateError}
+    hasLlmKey={hasLlmKey}
     setHoveredCard={setHoveredCard}
     hoveredCard={hoveredCard}
   />;

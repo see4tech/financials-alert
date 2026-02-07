@@ -49,10 +49,7 @@ export type DashboardContentProps = {
   recsLoading: boolean;
   recsError: string | null;
   aiRecommendations: AiRecommendation[] | null;
-  handlePopulateSymbols: () => void;
-  populateLoading: boolean;
-  populateSuccess: string | null;
-  populateError: string | null;
+  hasLlmKey: boolean;
   setHoveredCard: (v: string | null) => void;
   hoveredCard: string | null;
 };
@@ -91,10 +88,7 @@ export function DashboardContent(props: DashboardContentProps) {
     recsLoading,
     recsError,
     aiRecommendations,
-    handlePopulateSymbols,
-    populateLoading,
-    populateSuccess,
-    populateError,
+    hasLlmKey,
     setHoveredCard,
     hoveredCard,
   } = props;
@@ -347,23 +341,10 @@ export function DashboardContent(props: DashboardContentProps) {
           >
             {recsLoading ? t('common.loading') : t('dashboard.generateRecommendations')}
           </button>
-          <p className="text-xs text-gray-500 mb-2">{t('dashboard.configureLlmHint')}</p>
+          {!hasLlmKey && <p className="text-xs text-gray-500 mb-2">{t('dashboard.configureLlmHint')}</p>}
         </>
       )}
       {userAssets.length === 0 && <p className="text-sm text-gray-500 mb-6">{t('dashboard.noAssetsHint')}</p>}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <button
-          type="button"
-          onClick={handlePopulateSymbols}
-          disabled={populateLoading}
-          className="rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-          title={t('dashboard.populateSymbolsHint')}
-        >
-          {populateLoading ? t('common.loading') : t('dashboard.populateSymbols')}
-        </button>
-        {populateSuccess && <span className="text-xs text-green-600">{populateSuccess}</span>}
-        {populateError && <span className="text-xs text-red-600">{populateError}</span>}
-      </div>
       {recsError && <p className="text-sm text-red-600 mb-4">{recsError}</p>}
       {aiRecommendations && aiRecommendations.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
