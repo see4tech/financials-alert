@@ -215,7 +215,7 @@ export default function DashboardPage() {
     }
   }, [locale]);
 
-  const handleMarketScan = useCallback(async () => {
+  const handleMarketScan = useCallback(async (count: number, assetTypes: string[]) => {
     const client = getSupabaseBrowser();
     if (!client) return;
     const { data: { session } } = await client.auth.getSession();
@@ -224,7 +224,7 @@ export default function DashboardPage() {
     setScanLoading(true);
     setScanResults(null);
     try {
-      const result = await fetchMarketScan(session.access_token, locale);
+      const result = await fetchMarketScan(session.access_token, locale, count, assetTypes);
       console.log('[market-scan] raw response:', JSON.stringify(result));
       const items = result.scan || [];
       setScanResults(items);

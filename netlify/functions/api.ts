@@ -357,7 +357,9 @@ function pickTopCandidates(candidates: ScanCandidate[], total = 20, minPerType =
   return picked.slice(0, total);
 }
 
-/** Call OpenAI to select top 5 buying opportunities from the candidates. */
+const VALID_ASSET_TYPES = ['stock', 'etf', 'commodity', 'crypto'] as const;
+
+/** Call OpenAI to select top N buying opportunities from the candidates. */
 async function getMarketScanFromOpenAI(
   apiKey: string,
   dashboardSummary: string,
@@ -370,6 +372,7 @@ async function getMarketScanFromOpenAI(
     fifty_two_week_high?: number;
   }>,
   locale = 'en',
+  count = 5,
 ): Promise<
   Array<{
     symbol: string;
@@ -390,7 +393,7 @@ async function getMarketScanFromOpenAI(
         `${c.symbol} | ${c.name} | ${c.asset_type} | price: ${c.current_price ?? 'unknown'} | daily change: ${c.pct_change != null ? c.pct_change.toFixed(2) + '%' : 'unknown'} | 52w high: ${c.fifty_two_week_high ?? 'unknown'}`,
     )
     .join('\n');
-  const prompt = `You are a financial assistant. Given the following market context and 20 screening candidates, select the TOP 5 best buying opportunities right now.
+  const prompt = `You are a financial assistant. Given the following market context and ${candidates.length} screening candidates, select the TOP ${count} best buying opportunities right now.
 
 For each pick provide: symbol, name, asset_type, action ("buy"), entry_price (suggested entry), take_profit, stop_loss, and a short reasoning (2–3 sentences).
 
@@ -402,7 +405,7 @@ ${dashboardSummary}
 Candidates:
 ${candidatesText}
 
-Respond with a JSON object containing a "picks" array of exactly 5 objects, each with keys: symbol, name, asset_type, action, current_price, entry_price, take_profit, stop_loss, reasoning.`;
+Respond with a JSON object containing a "picks" array of exactly ${count} objects, each with keys: symbol, name, asset_type, action, current_price, entry_price, take_profit, stop_loss, reasoning.`;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -848,16 +851,28 @@ async function getApp(): Promise<express.Express> {
           .maybeSingle();
         userLocale = (prefRow?.locale as string) || 'en';
       }
-      console.log('[market-scan] locale:', userLocale);
+      // Read count (number of picks)
+      const rawCount = req.body?.count;
+      const count = typeof rawCount === 'number' && rawCount >= 1 && rawCount <= 20 ? Math.floor(rawCount) : 5;
 
-      // Phase 1: Fetch screening data in parallel
+      // Read asset type filter
+      const rawAssetTypes = req.body?.assetTypes;
+      let assetTypes: string[] = VALID_ASSET_TYPES.slice();
+      if (Array.isArray(rawAssetTypes) && rawAssetTypes.length > 0) {
+        const filtered = rawAssetTypes.filter((t: unknown) => typeof t === 'string' && (VALID_ASSET_TYPES as readonly string[]).includes(t));
+        if (filtered.length > 0) assetTypes = filtered;
+      }
+
+      console.log('[market-scan] locale:', userLocale, 'count:', count, 'assetTypes:', assetTypes);
+
+      // Phase 1: Fetch screening data in parallel (only for requested asset types)
       const twelveDataKey = process.env.TWELVE_DATA_API_KEY || '';
       console.log('[market-scan] Phase 1: fetching screening data...');
       const [stocks, etfs, crypto, commodities] = await Promise.all([
-        fetchNasdaqScreener('stocks', 200),
-        fetchNasdaqScreener('etf', 100),
-        fetchCoinGeckoTop(50),
-        twelveDataKey ? fetchCommodityQuotes(twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('stock') ? fetchNasdaqScreener('stocks', 200) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('etf') ? fetchNasdaqScreener('etf', 100) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('crypto') ? fetchCoinGeckoTop(50) : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('commodity') && twelveDataKey ? fetchCommodityQuotes(twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
       ]);
       console.log(`[market-scan] Phase 1 results: stocks=${stocks.length}, etfs=${etfs.length}, crypto=${crypto.length}, commodities=${commodities.length}`);
 
@@ -894,7 +909,7 @@ async function getApp(): Promise<express.Express> {
       const dashboardSummary = `Score: ${dashboard.score}, Delta week: ${dashboard.deltaWeek}. Scenario: bull=${dashboard.scenario.bull}, bear=${dashboard.scenario.bear}.\nIndicators:\n${indSummary}`;
 
       // Phase 3 (cont): AI refinement
-      console.log('[market-scan] Phase 3: calling OpenAI for top 5 picks...');
+      console.log(`[market-scan] Phase 3: calling OpenAI for top ${count} picks...`);
       const scan = await getMarketScanFromOpenAI(
         llmRow.api_key,
         dashboardSummary,
@@ -907,6 +922,7 @@ async function getApp(): Promise<express.Express> {
           fifty_two_week_high: c.fifty_two_week_high,
         })),
         userLocale,
+        count,
       );
       console.log('[market-scan] result count:', scan.length);
       return res.json({ scan });

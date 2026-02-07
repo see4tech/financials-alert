@@ -177,11 +177,15 @@ export type MarketScanResult = {
 export async function fetchMarketScan(
   accessToken: string,
   locale = 'en',
+  count = 5,
+  assetTypes?: string[],
 ): Promise<{ scan: MarketScanResult[] }> {
+  const payload: Record<string, unknown> = { locale, count };
+  if (assetTypes && assetTypes.length > 0) payload.assetTypes = assetTypes;
   const res = await fetch(`${API_BASE}/api/market-scan`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ locale }),
+    body: JSON.stringify(payload),
   });
   await throwOnNotOk(res);
   const text = await res.text();
