@@ -194,20 +194,6 @@ export function DashboardContent(props: DashboardContentProps) {
             </span>
             <span className="cb-action-label">{backfillLoading ? '...' : t('dashboard.backfillHistory')}</span>
           </button>
-
-          <button type="button" onClick={() => setActiveTab('scanner')} className="cb-action-btn group">
-            <span className="cb-action-circle bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-900/60">
-              <SearchIcon />
-            </span>
-            <span className="cb-action-label">{t('dashboard.scanMarket')}</span>
-          </button>
-
-          <button type="button" onClick={() => setActiveTab('assets')} className="cb-action-btn group">
-            <span className="cb-action-circle bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-400 group-hover:bg-purple-200 dark:group-hover:bg-purple-900/60">
-              <SparkleIcon />
-            </span>
-            <span className="cb-action-label">{t('dashboard.tabAssets')}</span>
-          </button>
         </div>
 
         {/* Status messages */}
