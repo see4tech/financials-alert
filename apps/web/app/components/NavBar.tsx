@@ -2,14 +2,41 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useLocale } from '@/app/context/LocaleContext';
+import { useTheme } from '@/app/context/ThemeContext';
 import { useSupabaseAuthReady } from '@/app/context/SupabaseAuthContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
 
+function SunIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v1m0 16v1m8.66-13.66l-.71.71M4.05 19.95l-.71.71M21 12h-1M4 12H3m16.66 7.66l-.71-.71M4.05 4.05l-.71-.71M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+    </svg>
+  );
+}
+
+function MoonIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.005 9.005 0 0012 21a9.005 9.005 0 008.354-5.646z" />
+    </svg>
+  );
+}
+
+function MonitorIcon() {
+  return (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  );
+}
+
 export function NavBar() {
   const { t, locale, setLocale } = useLocale();
+  const { theme, setTheme } = useTheme();
   const router = useRouter();
+  const pathname = usePathname();
   const clientReady = useSupabaseAuthReady();
   const [session, setSession] = useState<boolean | null>(null);
 
@@ -38,63 +65,98 @@ export function NavBar() {
     router.push('/login');
   }
 
+  const navLink = (href: string, label: string) => {
+    const isActive = pathname === href;
+    return (
+      <Link
+        href={href}
+        className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+          isActive
+            ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300'
+            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50'
+        }`}
+      >
+        {label}
+      </Link>
+    );
+  };
+
+  const cycleTheme = () => {
+    const order: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system'];
+    const idx = order.indexOf(theme);
+    setTheme(order[(idx + 1) % order.length]);
+  };
+
+  const themeIcon = theme === 'dark' ? <MoonIcon /> : theme === 'light' ? <SunIcon /> : <MonitorIcon />;
+
   return (
-    <nav className="mb-8 flex flex-wrap items-center gap-4">
-      {session === true && (
-        <>
-          <Link href="/dashboard" className="text-blue-600 hover:underline">
-            {t('nav.dashboard')}
-          </Link>
-          <Link href="/indicators" className="text-blue-600 hover:underline">
-            {t('nav.indicators')}
-          </Link>
-          <Link href="/alerts" className="text-blue-600 hover:underline">
-            {t('nav.alerts')}
-          </Link>
-          <Link href="/settings" className="text-blue-600 hover:underline">
-            {t('nav.settings')}
-          </Link>
+    <nav className="sticky top-0 z-40 -mx-8 mb-8 px-8 py-3 border-b border-slate-200/60 dark:border-slate-700/60 bg-white/80 dark:bg-slate-900/80 glass">
+      <div className="flex flex-wrap items-center gap-2">
+        {session === true && (
+          <>
+            {navLink('/dashboard', t('nav.dashboard'))}
+            {navLink('/indicators', t('nav.indicators'))}
+            {navLink('/alerts', t('nav.alerts'))}
+            {navLink('/settings', t('nav.settings'))}
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 transition-colors"
+            >
+              {t('nav.logout')}
+            </button>
+          </>
+        )}
+        {(session === false || session === null) && (
+          <>
+            {navLink('/login', t('nav.login'))}
+            {navLink('/signup', t('nav.signup'))}
+          </>
+        )}
+
+        {/* Spacer */}
+        <span className="flex-1" />
+
+        {/* Theme toggle */}
+        <button
+          type="button"
+          onClick={cycleTheme}
+          className="p-2 rounded-lg text-slate-500 hover:text-slate-700 hover:bg-slate-100 dark:text-slate-400 dark:hover:text-slate-200 dark:hover:bg-slate-700/50 transition-colors"
+          aria-label={`Theme: ${theme}`}
+          title={`Theme: ${theme}`}
+        >
+          {themeIcon}
+        </button>
+
+        {/* Locale switcher */}
+        <div className="flex items-center gap-1 text-sm">
           <button
             type="button"
-            onClick={handleLogout}
-            className="text-blue-600 hover:underline ml-auto"
+            onClick={() => setLocale('es')}
+            className={`px-2 py-1 rounded transition-colors ${
+              locale === 'es'
+                ? 'font-semibold text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-500/20'
+                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+            aria-pressed={locale === 'es'}
           >
-            {t('nav.logout')}
+            ES
           </button>
-        </>
-      )}
-      {(session === false || session === null) && (
-        <>
-          <Link href="/login" className="text-blue-600 hover:underline">
-            {t('nav.login')}
-          </Link>
-          <Link href="/signup" className="text-blue-600 hover:underline">
-            {t('nav.signup')}
-          </Link>
-          <span className="ml-auto" />
-        </>
-      )}
-      <span className="ml-auto flex gap-2 text-sm">
-        <button
-          type="button"
-          onClick={() => setLocale('es')}
-          className={locale === 'es' ? 'font-semibold text-blue-600 underline' : 'text-gray-600 hover:text-blue-600'}
-          aria-pressed={locale === 'es'}
-        >
-          ES
-        </button>
-        <span className="text-gray-400" aria-hidden>
-          |
-        </span>
-        <button
-          type="button"
-          onClick={() => setLocale('en')}
-          className={locale === 'en' ? 'font-semibold text-blue-600 underline' : 'text-gray-600 hover:text-blue-600'}
-          aria-pressed={locale === 'en'}
-        >
-          EN
-        </button>
-      </span>
+          <span className="text-slate-300 dark:text-slate-600" aria-hidden>|</span>
+          <button
+            type="button"
+            onClick={() => setLocale('en')}
+            className={`px-2 py-1 rounded transition-colors ${
+              locale === 'en'
+                ? 'font-semibold text-indigo-600 bg-indigo-50 dark:text-indigo-300 dark:bg-indigo-500/20'
+                : 'text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200'
+            }`}
+            aria-pressed={locale === 'en'}
+          >
+            EN
+          </button>
+        </div>
+      </div>
     </nav>
   );
 }

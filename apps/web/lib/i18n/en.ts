@@ -203,6 +203,10 @@ export const en = {
   },
   settings: {
     title: 'Settings',
+    theme: 'Theme',
+    themeLight: 'Light',
+    themeDark: 'Dark',
+    themeSystem: 'System',
     llmSectionTitle: 'AI provider (for recommendations)',
     llmSectionHint: 'Choose your preferred provider and save your API key. The key is stored securely and never shown again.',
     llmProvider: 'Provider',

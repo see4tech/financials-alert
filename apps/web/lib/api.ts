@@ -111,8 +111,8 @@ export async function saveLlmSettings(
   return res.json();
 }
 
-// ── User preferences (locale) ──
-export async function getUserPreferences(accessToken: string): Promise<{ locale: string }> {
+// ── User preferences (locale, theme) ──
+export async function getUserPreferences(accessToken: string): Promise<{ locale: string; theme: string }> {
   const res = await fetch(`${API_BASE}/api/user/preferences`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -122,8 +122,8 @@ export async function getUserPreferences(accessToken: string): Promise<{ locale:
 
 export async function saveUserPreferences(
   accessToken: string,
-  payload: { locale: string },
-): Promise<{ locale: string; saved: boolean }> {
+  payload: { locale?: string; theme?: string },
+): Promise<{ locale?: string; theme?: string; saved: boolean }> {
   const res = await fetch(`${API_BASE}/api/user/preferences`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },

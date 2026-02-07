@@ -52,7 +52,7 @@ export default function DashboardPage() {
   const [scanError, setScanError] = useState<string | null>(null);
 
   const statusIconColor = useCallback((s: string): string =>
-    s === 'GREEN' ? 'text-green-600' : s === 'RED' ? 'text-red-600' : s === 'YELLOW' ? 'text-amber-500' : 'text-gray-400', []);
+    s === 'GREEN' ? 'text-emerald-500 dark:text-emerald-400' : s === 'RED' ? 'text-red-500 dark:text-red-400' : s === 'YELLOW' ? 'text-amber-500 dark:text-amber-400' : 'text-slate-400 dark:text-slate-500', []);
   const trendArrow = useCallback((trend: string): string =>
     trend === 'RISING' ? '↑' : trend === 'FALLING' ? '↓' : '→', []);
 
@@ -239,7 +239,7 @@ export default function DashboardPage() {
     }
   }, [locale]);
 
-  if (loading) return <div className="p-8">{t('common.loading')}</div>;
+  if (loading) return <div className="p-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
   if (error) {
     return <DashboardErrorView
       error={error}

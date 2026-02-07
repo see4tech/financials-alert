@@ -885,7 +885,7 @@ async function getApp(): Promise<express.Express> {
     }
   });
 
-  // ── User preferences (locale, etc.) ──
+  // ── User preferences (locale, theme, etc.) ──
   app.get('/api/user/preferences', async (req: Request, res: Response) => {
     try {
       const userId = await getUserIdFromRequest(req);
@@ -893,14 +893,14 @@ async function getApp(): Promise<express.Express> {
       const supabase = getSupabaseService();
       const { data: row, error } = await supabase
         .from('user_preferences')
-        .select('locale')
+        .select('locale, theme')
         .eq('user_id', userId)
         .maybeSingle();
       if (error) {
         console.error('/api/user/preferences GET', error);
         return res.status(500).json({ error: errorMessage(error) });
       }
-      return res.json({ locale: row?.locale ?? 'en' });
+      return res.json({ locale: row?.locale ?? 'en', theme: row?.theme ?? 'system' });
     } catch (e) {
       console.error('/api/user/preferences GET', e);
       return res.status(500).json({ error: errorMessage(e) });
@@ -911,22 +911,32 @@ async function getApp(): Promise<express.Express> {
     try {
       const userId = await getUserIdFromRequest(req);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
-      const { locale } = req.body ?? {};
-      if (typeof locale !== 'string' || !['en', 'es'].includes(locale)) {
-        return res.status(400).json({ error: 'locale must be one of: en, es' });
+      const body = req.body ?? {};
+      // Build upsert payload – only include fields that were sent
+      const upsertData: Record<string, unknown> = { user_id: userId, updated_at: new Date().toISOString() };
+      if ('locale' in body) {
+        const { locale } = body;
+        if (typeof locale !== 'string' || !['en', 'es'].includes(locale)) {
+          return res.status(400).json({ error: 'locale must be one of: en, es' });
+        }
+        upsertData.locale = locale;
+      }
+      if ('theme' in body) {
+        const { theme } = body;
+        if (typeof theme !== 'string' || !['light', 'dark', 'system'].includes(theme)) {
+          return res.status(400).json({ error: 'theme must be one of: light, dark, system' });
+        }
+        upsertData.theme = theme;
       }
       const supabase = getSupabaseService();
       const { error } = await supabase
         .from('user_preferences')
-        .upsert(
-          { user_id: userId, locale, updated_at: new Date().toISOString() },
-          { onConflict: 'user_id' },
-        );
+        .upsert(upsertData, { onConflict: 'user_id' });
       if (error) {
         console.error('/api/user/preferences POST', error);
         return res.status(500).json({ error: errorMessage(error) });
       }
-      return res.json({ locale, saved: true });
+      return res.json({ ...(upsertData.locale ? { locale: upsertData.locale } : {}), ...(upsertData.theme ? { theme: upsertData.theme } : {}), saved: true });
     } catch (e) {
       console.error('/api/user/preferences POST', e);
       return res.status(500).json({ error: errorMessage(e) });

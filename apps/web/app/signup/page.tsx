@@ -53,14 +53,14 @@ export default function SignupPage() {
 
   if (clientReady && authConfigured === false) {
     return (
-      <main className="min-h-screen p-8 bg-gray-50">
+      <main className="min-h-screen p-8 bg-slate-50 dark:bg-slate-900">
         <div className="max-w-4xl mx-auto mb-6">
           <NavBar />
         </div>
         <div className="flex items-center justify-center">
-          <div className="w-full max-w-sm border rounded-lg p-6 bg-white shadow-sm">
-            <p className="text-sm text-amber-800 mb-4">{t('auth.notConfigured')}</p>
-            <Link href="/dashboard" className="text-blue-600 hover:underline">
+          <div className="w-full max-w-sm rounded-xl p-6 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700">
+            <p className="text-sm text-amber-800 dark:text-amber-300 mb-4">{t('auth.notConfigured')}</p>
+            <Link href="/dashboard" className="text-indigo-600 dark:text-indigo-400 hover:underline">
               {t('nav.dashboard')}
             </Link>
           </div>
@@ -70,16 +70,16 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen p-8 bg-gray-50">
+    <main className="min-h-screen p-8 bg-slate-50 dark:bg-slate-900">
       <div className="max-w-4xl mx-auto mb-6">
         <NavBar />
       </div>
       <div className="flex items-center justify-center">
-      <div className="w-full max-w-sm border rounded-lg p-6 bg-white shadow-sm">
-        <h1 className="text-xl font-bold mb-4">{t('auth.signup')}</h1>
+      <div className="w-full max-w-sm rounded-xl p-6 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-4">{t('auth.signup')}</h1>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label htmlFor="signup-email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="signup-email" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
               {t('auth.email')}
             </label>
             <input
@@ -89,11 +89,11 @@ export default function SignupPage() {
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
           <div>
-            <label htmlFor="signup-password" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="signup-password" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
               {t('auth.password')}
             </label>
             <input
@@ -104,20 +104,20 @@ export default function SignupPage() {
               required
               autoComplete="new-password"
               minLength={6}
-              className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+              className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-600 text-white rounded px-3 py-2 text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+            className="w-full bg-indigo-600 text-white rounded-lg px-3 py-2 text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition-colors"
           >
             {loading ? t('common.loading') : t('auth.signup')}
           </button>
         </form>
-        <p className="mt-4 text-sm text-gray-600">
-          <Link href="/login" className="text-blue-600 hover:underline">
+        <p className="mt-4 text-sm text-slate-600 dark:text-slate-400">
+          <Link href="/login" className="text-indigo-600 dark:text-indigo-400 hover:underline">
             {t('auth.login')}
           </Link>
         </p>

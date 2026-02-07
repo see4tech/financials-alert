@@ -206,6 +206,10 @@ export const es: typeof en = {
   },
   settings: {
     title: 'Ajustes',
+    theme: 'Tema',
+    themeLight: 'Claro',
+    themeDark: 'Oscuro',
+    themeSystem: 'Sistema',
     llmSectionTitle: 'Proveedor de IA (para recomendaciones)',
     llmSectionHint: 'Elige tu proveedor y guarda tu API key. La clave se guarda de forma segura y no se vuelve a mostrar.',
     llmProvider: 'Proveedor',

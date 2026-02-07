@@ -18,7 +18,7 @@ export default function IndicatorsPage() {
   return (
     <main className="min-h-screen p-8 max-w-6xl mx-auto">
       <NavBar />
-      <h1 className="text-2xl font-bold mb-6">{t('indicators.title')}</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('indicators.title')}</h1>
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {CORE_KEYS.map((indKey) => {
           const labelKey = 'dashboard.indicatorShortLabel.' + indKey;
@@ -26,9 +26,9 @@ export default function IndicatorsPage() {
           return (
             <div
               key={indKey}
-              className="border rounded-lg p-4 bg-white shadow-sm"
+              className="rounded-xl p-5 bg-white dark:bg-slate-800 shadow-sm border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow"
             >
-              <h2 className="text-lg font-semibold text-gray-800 mb-3">{label}</h2>
+              <h2 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-3">{label}</h2>
               <IndicatorChart indicatorKey={indKey} compact />
             </div>
           );

@@ -43,14 +43,14 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
 
   if (loading) {
     return (
-      <div className={compact ? 'py-4 text-sm text-gray-500' : 'p-8 text-gray-500'}>
+      <div className={compact ? 'py-4 text-sm text-slate-500 dark:text-slate-400' : 'p-8 text-slate-500 dark:text-slate-400'}>
         {t('common.loading')}
       </div>
     );
   }
   if (error) {
     return (
-      <div className={compact ? 'py-4 text-sm text-red-600' : 'p-8 text-red-600'}>
+      <div className={compact ? 'py-4 text-sm text-red-600 dark:text-red-400' : 'p-8 text-red-600 dark:text-red-400'}>
         {t('common.error')}: {error}
       </div>
     );
@@ -83,27 +83,27 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
         <button
           type="button"
           onClick={() => setRange('30d')}
-          className={`px-3 py-1 rounded text-sm ${range === '30d' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          className={`px-3 py-1 rounded-lg text-sm transition-colors ${range === '30d' ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'}`}
         >
           {t('indicatorsDetail.period30')}
         </button>
         <button
           type="button"
           onClick={() => setRange('90d')}
-          className={`px-3 py-1 rounded text-sm ${range === '90d' ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-700'}`}
+          className={`px-3 py-1 rounded-lg text-sm transition-colors ${range === '90d' ? 'bg-indigo-600 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-slate-600'}`}
         >
           {t('indicatorsDetail.period90')}
         </button>
       </div>
       {points.length === 0 ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-800">
+        <div className="rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30 p-4 text-amber-800 dark:text-amber-300">
           <p className="font-medium text-sm">{t('indicatorsDetail.noHistory')}</p>
           <p className="mt-1 text-xs">{t('indicatorsDetail.noHistoryHint')}</p>
         </div>
       ) : (
-        <div className="border rounded-lg p-4 bg-white relative">
+        <div className="rounded-xl border border-slate-200 dark:border-slate-700 p-4 bg-white dark:bg-slate-800/50 relative">
           <div className={`flex gap-2 ${chartHeight}`}>
-            <div className="flex flex-col justify-between text-right text-xs text-gray-500 pr-2 shrink-0">
+            <div className="flex flex-col justify-between text-right text-xs text-slate-500 dark:text-slate-400 pr-2 shrink-0">
               {yTicks.map((v) => (
                 <span key={v}>{typeof v === 'number' && v % 1 !== 0 ? v.toFixed(2) : v}</span>
               ))}
@@ -113,7 +113,7 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
                 {points.map((p) => (
                   <div
                     key={p.ts}
-                    className="flex-1 bg-blue-500 rounded-t min-w-0"
+                    className="flex-1 bg-indigo-500 dark:bg-indigo-400 rounded-t min-w-0 hover:bg-indigo-600 dark:hover:bg-indigo-300 transition-colors"
                     style={{
                       height: `${barHeightPct(p)}%`,
                     }}
@@ -129,7 +129,7 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
                   />
                 ))}
               </div>
-              <div className="flex text-xs text-gray-500 mt-1 gap-px">
+              <div className="flex text-xs text-slate-500 dark:text-slate-400 mt-1 gap-px">
                 {points.map((p, i) => (
                   <span key={p.ts} className="flex-1 min-w-0 text-center" style={{ flex: 1 }}>
                     {i % xStep === 0 ? xFormat(p.ts) : ''}
@@ -140,7 +140,7 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
           </div>
           {hoveredBar && (
             <div
-              className="fixed z-50 px-2 py-1 text-xs font-medium bg-gray-800 text-white rounded shadow-lg pointer-events-none"
+              className="fixed z-50 px-2 py-1 text-xs font-medium bg-slate-800 dark:bg-slate-700 text-white rounded-lg shadow-lg pointer-events-none"
               style={{
                 left: hoveredBar.x,
                 top: hoveredBar.y - 32,
@@ -150,7 +150,7 @@ export function IndicatorChart({ indicatorKey, compact = false }: IndicatorChart
               {formatDate(hoveredBar.point.ts)}: {hoveredBar.point.value}
             </div>
           )}
-          <p className="text-xs text-gray-500 mt-2">{t('indicatorsDetail.chartHint')}</p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-2">{t('indicatorsDetail.chartHint')}</p>
         </div>
       )}
     </div>

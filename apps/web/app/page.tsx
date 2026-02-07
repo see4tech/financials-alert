@@ -43,7 +43,7 @@ export default function Home() {
   if (!clientReady || !resolved) {
     return (
       <main className="min-h-screen flex items-center justify-center p-8">
-        <p className="text-gray-500">{t('common.loading')}</p>
+        <p className="text-slate-500 dark:text-slate-400">{t('common.loading')}</p>
       </main>
     );
   }

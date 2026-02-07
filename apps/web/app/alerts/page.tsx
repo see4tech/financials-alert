@@ -163,48 +163,48 @@ export default function AlertsPage() {
     }
   };
 
-  if (loading) return <div className="p-8">{t('common.loading')}</div>;
-  if (error) return <div className="p-8 text-red-600">{t('common.error')}: {error}</div>;
+  if (loading) return <div className="p-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
+  if (error) return <div className="p-8 text-red-600 dark:text-red-400">{t('common.error')}: {error}</div>;
 
   return (
     <main className="min-h-screen p-8 max-w-4xl mx-auto">
       <NavBar />
-      <h1 className="text-2xl font-bold mb-6">{t('alerts.title')}</h1>
+      <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 mb-6">{t('alerts.title')}</h1>
 
       <section className="mb-8">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">{t('alerts.rules')}</h2>
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100">{t('alerts.rules')}</h2>
           <button
             type="button"
             onClick={openCreate}
-            className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors shadow-sm"
           >
             {t('alerts.createRule')}
           </button>
         </div>
-        {submitError && <p className="mb-2 text-sm text-red-600">{submitError}</p>}
+        {submitError && <p className="mb-2 text-sm text-red-600 dark:text-red-400">{submitError}</p>}
         <ul className="space-y-2">
           {rules.map((r) => (
             <li
               key={r.id}
-              className="border rounded p-3 flex flex-wrap items-center justify-between gap-2"
+              className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 flex flex-wrap items-center justify-between gap-2 shadow-sm"
             >
-              <span className="font-mono text-sm">{String(r.json_rule?.name ?? r.id)}</span>
+              <span className="font-mono text-sm text-slate-900 dark:text-slate-100">{String(r.json_rule?.name ?? r.id)}</span>
               <div className="flex items-center gap-2">
-                <span className={r.is_enabled ? 'text-green-600' : 'text-gray-400'}>
+                <span className={r.is_enabled ? 'text-green-600 dark:text-green-400' : 'text-slate-400 dark:text-slate-500'}>
                   {r.is_enabled ? t('alerts.on') : t('alerts.off')}
                 </span>
                 <button
                   type="button"
                   onClick={() => openEdit(r)}
-                  className="text-sm text-blue-600 hover:underline"
+                  className="text-sm text-indigo-600 dark:text-indigo-400 hover:underline"
                 >
                   {t('alerts.editRule')}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleDelete(r.id)}
-                  className="text-sm text-red-600 hover:underline"
+                  className="text-sm text-red-600 dark:text-red-400 hover:underline"
                 >
                   {t('alerts.deleteRule')}
                 </button>
@@ -212,17 +212,17 @@ export default function AlertsPage() {
             </li>
           ))}
         </ul>
-        {rules.length === 0 && !formOpen && <p className="text-gray-500">{t('alerts.noRules')}</p>}
+        {rules.length === 0 && !formOpen && <p className="text-slate-500 dark:text-slate-400">{t('alerts.noRules')}</p>}
       </section>
 
       {formOpen && (
-        <div className="mb-8 rounded-lg border bg-white p-4 shadow-sm">
-          <h3 className="text-md font-semibold mb-3">
+        <div className="mb-8 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-5 shadow-sm">
+          <h3 className="text-md font-semibold text-slate-900 dark:text-slate-100 mb-3">
             {editingId ? t('alerts.editRule') : t('alerts.createRule')}
           </h3>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div>
-              <label htmlFor="rule-name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="rule-name" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 {t('alerts.name')}
               </label>
               <input
@@ -231,18 +231,18 @@ export default function AlertsPage() {
                 value={form.name}
                 onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
                 required
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
             <div>
-              <label htmlFor="rule-condition" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="rule-condition" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 {t('alerts.conditionType')}
               </label>
               <select
                 id="rule-condition"
                 value={form.conditionType}
                 onChange={(e) => setForm((f) => ({ ...f, conditionType: e.target.value }))}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {CONDITION_TYPES.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -252,14 +252,14 @@ export default function AlertsPage() {
               </select>
             </div>
             <div>
-              <label htmlFor="rule-indicator" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="rule-indicator" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                 {t('alerts.indicator')}
               </label>
               <select
                 id="rule-indicator"
                 value={form.indicatorKey}
                 onChange={(e) => setForm((f) => ({ ...f, indicatorKey: e.target.value }))}
-                className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
               >
                 {INDICATOR_KEYS.map((key) => (
                   <option key={key} value={key}>
@@ -272,7 +272,7 @@ export default function AlertsPage() {
             </div>
             {(form.conditionType === 'cross_below' || form.conditionType === 'cross_above') && (
               <div>
-                <label htmlFor="rule-threshold" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="rule-threshold" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   {t('alerts.threshold')}
                 </label>
                 <input
@@ -281,7 +281,7 @@ export default function AlertsPage() {
                   step="any"
                   value={form.threshold}
                   onChange={(e) => setForm((f) => ({ ...f, threshold: e.target.value }))}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             )}
@@ -289,7 +289,7 @@ export default function AlertsPage() {
               form.conditionType === 'cross_above' ||
               form.conditionType === 'persistence') && (
               <div>
-                <label htmlFor="rule-confirmations" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="rule-confirmations" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
                   {t('alerts.confirmations')}
                 </label>
                 <input
@@ -298,7 +298,7 @@ export default function AlertsPage() {
                   min={1}
                   value={form.confirmations}
                   onChange={(e) => setForm((f) => ({ ...f, confirmations: e.target.value }))}
-                  className="w-full border border-gray-300 rounded px-3 py-2 text-sm"
+                  className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
             )}
@@ -308,9 +308,9 @@ export default function AlertsPage() {
                 type="checkbox"
                 checked={form.is_enabled}
                 onChange={(e) => setForm((f) => ({ ...f, is_enabled: e.target.checked }))}
-                className="rounded border-gray-300"
+                className="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
               />
-              <label htmlFor="rule-enabled" className="text-sm text-gray-700">
+              <label htmlFor="rule-enabled" className="text-sm text-slate-700 dark:text-slate-300">
                 {t('alerts.enabled')}
               </label>
             </div>
@@ -320,25 +320,25 @@ export default function AlertsPage() {
                 type="checkbox"
                 checked={form.sendEmail}
                 onChange={(e) => setForm((f) => ({ ...f, sendEmail: e.target.checked }))}
-                className="rounded border-gray-300"
+                className="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
               />
-              <label htmlFor="rule-send-email" className="text-sm text-gray-700">
+              <label htmlFor="rule-send-email" className="text-sm text-slate-700 dark:text-slate-300">
                 {t('alerts.sendEmail')}
               </label>
             </div>
-            <p className="text-xs text-gray-500">{t('alerts.emailRecipientNote')}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{t('alerts.emailRecipientNote')}</p>
             <div className="flex gap-2 pt-2">
               <button
                 type="submit"
                 disabled={submitLoading}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+                className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
               >
                 {submitLoading ? t('common.loading') : t('alerts.save')}
               </button>
               <button
                 type="button"
                 onClick={closeForm}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                className="rounded-xl border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
               >
                 {t('alerts.cancel')}
               </button>
@@ -348,16 +348,16 @@ export default function AlertsPage() {
       )}
 
       <section>
-        <h2 className="text-lg font-semibold mb-4">{t('alerts.firedAlerts')}</h2>
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-4">{t('alerts.firedAlerts')}</h2>
         <ul className="space-y-2">
           {fired.map((a) => (
-            <li key={a.id} className="border rounded p-3 text-sm">
-              <span className="text-gray-500">{new Date(a.ts).toLocaleString()}</span>
-              <pre className="mt-1 overflow-auto">{JSON.stringify(a.payload ?? {}, null, 0)}</pre>
+            <li key={a.id} className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-3 text-sm shadow-sm">
+              <span className="text-slate-500 dark:text-slate-400">{new Date(a.ts).toLocaleString()}</span>
+              <pre className="mt-1 overflow-auto text-slate-700 dark:text-slate-300">{JSON.stringify(a.payload ?? {}, null, 0)}</pre>
             </li>
           ))}
         </ul>
-        {fired.length === 0 && <p className="text-gray-500">{t('alerts.noFired')}</p>}
+        {fired.length === 0 && <p className="text-slate-500 dark:text-slate-400">{t('alerts.noFired')}</p>}
       </section>
     </main>
   );
