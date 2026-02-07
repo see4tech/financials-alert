@@ -100,35 +100,117 @@ export const handler: Handler = async (event) => {
       console.warn('[populate] TWELVE_DATA_API_KEY not set – skipping stocks & ETFs & commodities from Twelve Data');
     }
 
-    // ── 2. ETFs from Twelve Data (US only, no exchange filter) ──
-    if (twelveDataKey) {
+    // ── 2. ETFs – Twelve Data + NASDAQ screener (Twelve Data is incomplete) ──
+    {
+      const etfRows: Array<{ symbol: string; name: string; asset_type: 'etf'; exchange: string | null }> = [];
+      const etfSeen = new Set<string>();
+
+      // 2a. Twelve Data ETFs
+      if (twelveDataKey) {
+        try {
+          console.log('[populate] Fetching ETFs from Twelve Data…');
+          const res = await fetch(
+            `https://api.twelvedata.com/etf?country=United+States&apikey=${twelveDataKey}`,
+          );
+          if (res.ok) {
+            const json = (await res.json()) as {
+              data?: Array<{ symbol: string; name: string; exchange: string }>;
+            };
+            if (!json.data || json.data.length === 0) {
+              console.warn('[populate] /etf returned empty data. Status:', res.status, 'snippet:', JSON.stringify(json).slice(0, 300));
+            }
+            for (const s of json.data || []) {
+              if (!etfSeen.has(s.symbol)) {
+                etfSeen.add(s.symbol);
+                etfRows.push({ symbol: s.symbol, name: s.name, asset_type: 'etf', exchange: s.exchange });
+              }
+            }
+            console.log(`[populate] ${etfRows.length} ETFs from Twelve Data`);
+          } else {
+            const body = await res.text().catch(() => '');
+            console.error('[populate] Twelve Data /etf status:', res.status, 'body:', body.slice(0, 300));
+          }
+        } catch (e) {
+          console.error('[populate] Twelve Data ETF error:', e);
+        }
+      }
+
+      // 2b. NASDAQ screener – supplements Twelve Data with missing ETFs (e.g. VOO, VIG)
       try {
-        console.log('[populate] Fetching ETFs from Twelve Data…');
+        console.log('[populate] Fetching ETFs from NASDAQ screener…');
         const res = await fetch(
-          `https://api.twelvedata.com/etf?country=United+States&apikey=${twelveDataKey}`,
+          'https://api.nasdaq.com/api/screener/stocks?tableType=etf&limit=10000',
+          { headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', Accept: 'application/json' } },
         );
         if (res.ok) {
           const json = (await res.json()) as {
-            data?: Array<{ symbol: string; name: string; exchange: string }>;
+            data?: {
+              table?: { rows?: Array<{ symbol: string; name: string }> };
+              rows?: Array<{ symbol: string; name: string }>;
+            };
           };
-          if (!json.data || json.data.length === 0) {
-            console.warn('[populate] /etf returned empty data. Status:', res.status, 'snippet:', JSON.stringify(json).slice(0, 300));
+          const rows = json?.data?.table?.rows || json?.data?.rows || [];
+          let added = 0;
+          for (const r of rows) {
+            const sym = (r.symbol || '').trim();
+            if (sym && !etfSeen.has(sym)) {
+              etfSeen.add(sym);
+              etfRows.push({ symbol: sym, name: (r.name || '').trim(), asset_type: 'etf', exchange: null });
+              added++;
+            }
           }
-          const rows = (json.data || []).map((s) => ({
-            symbol: s.symbol,
-            name: s.name,
-            asset_type: 'etf' as const,
-            exchange: s.exchange,
-          }));
-          console.log(`[populate] ${rows.length} ETFs fetched, upserting…`);
-          results.etfs = await batchUpsert(supabase, rows);
+          console.log(`[populate] ${added} additional ETFs from NASDAQ screener (total: ${etfRows.length})`);
         } else {
           const body = await res.text().catch(() => '');
-          console.error('[populate] Twelve Data /etf status:', res.status, 'body:', body.slice(0, 300));
+          console.warn('[populate] NASDAQ ETF screener status:', res.status, 'body:', body.slice(0, 300));
         }
       } catch (e) {
-        console.error('[populate] ETF error:', e);
+        console.warn('[populate] NASDAQ ETF screener error:', e);
       }
+
+      if (etfRows.length > 0) {
+        console.log(`[populate] ${etfRows.length} total ETFs, upserting…`);
+        results.etfs = await batchUpsert(supabase, etfRows);
+      }
+    }
+
+    // ── 2c. Supplement stocks from NASDAQ screener ──
+    try {
+      console.log('[populate] Fetching stocks from NASDAQ screener…');
+      const res = await fetch(
+        'https://api.nasdaq.com/api/screener/stocks?tableType=stocks&limit=25000',
+        { headers: { 'User-Agent': 'Mozilla/5.0 (compatible)', Accept: 'application/json' } },
+      );
+      if (res.ok) {
+        const json = (await res.json()) as {
+          data?: {
+            table?: { rows?: Array<{ symbol: string; name: string }> };
+            rows?: Array<{ symbol: string; name: string }>;
+          };
+        };
+        const rows = json?.data?.table?.rows || json?.data?.rows || [];
+        const stockRows = rows
+          .filter((r) => (r.symbol || '').trim().length > 0)
+          .map((r) => ({
+            symbol: (r.symbol || '').trim(),
+            name: (r.name || '').trim(),
+            asset_type: 'stock' as const,
+            exchange: null as string | null,
+          }));
+        if (stockRows.length > 0) {
+          console.log(`[populate] ${stockRows.length} stocks from NASDAQ screener, upserting…`);
+          const nasdaqStocks = await batchUpsert(supabase, stockRows);
+          results.stocks = (results.stocks || 0) + nasdaqStocks;
+          results.nasdaq_stocks_supplement = nasdaqStocks;
+        } else {
+          console.warn('[populate] NASDAQ stock screener returned 0 rows');
+        }
+      } else {
+        const body = await res.text().catch(() => '');
+        console.warn('[populate] NASDAQ stock screener status:', res.status, 'body:', body.slice(0, 300));
+      }
+    } catch (e) {
+      console.warn('[populate] NASDAQ stock screener error:', e);
     }
 
     // ── 3. Commodities – Twelve Data dynamic list + hardcoded fallback ──

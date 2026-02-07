@@ -130,7 +130,7 @@ export const es: typeof en = {
     searchAssetLabel: 'Buscar activo',
     searchAssetPlaceholder: 'Buscar por símbolo o nombre (ej. AAPL, Bitcoin, Vanguard)…',
     noSymbolsFound: 'No se encontraron símbolos.',
-    populateHint: 'Haz clic en "Cargar símbolos" para poblar la base de datos primero.',
+    populateHint: 'Intenta con otro término de búsqueda o verifica la ortografía.',
     alreadyAdded: 'Añadido',
     populateSymbols: 'Cargar símbolos',
     populateSymbolsHint: 'Carga todos los símbolos de acciones, ETF, materias primas y cripto desde Twelve Data y CoinGecko.',

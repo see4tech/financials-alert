@@ -127,7 +127,7 @@ export const en = {
     searchAssetLabel: 'Search asset',
     searchAssetPlaceholder: 'Search by symbol or name (e.g. AAPL, Bitcoin, Vanguard)…',
     noSymbolsFound: 'No symbols found.',
-    populateHint: 'Click "Populate Symbols" to load the symbols database first.',
+    populateHint: 'Try a different search term or check the spelling.',
     alreadyAdded: 'Added',
     populateSymbols: 'Populate Symbols',
     populateSymbolsHint: 'Load all stock, ETF, commodity and crypto symbols from Twelve Data and CoinGecko into the search database.',
