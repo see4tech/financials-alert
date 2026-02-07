@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from '@/app/context/LocaleContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
-import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, fetchRecommendations, getLlmSettings, type AiRecommendation } from '@/lib/api';
+import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, getLlmSettings, type AiRecommendation } from '@/lib/api';
 import { DashboardContent } from './DashboardContent';
 import { DashboardErrorView } from './DashboardErrorView';
 
@@ -44,6 +44,9 @@ export default function DashboardPage() {
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[] | null>(null);
   const [recsError, setRecsError] = useState<string | null>(null);
   const [hasLlmKey, setHasLlmKey] = useState(false);
+  const [populateLoading, setPopulateLoading] = useState(false);
+  const [populateSuccess, setPopulateSuccess] = useState<string | null>(null);
+  const [populateError, setPopulateError] = useState<string | null>(null);
 
   const statusIconColor = useCallback((s: string): string =>
     s === 'GREEN' ? 'text-green-600' : s === 'RED' ? 'text-red-600' : s === 'YELLOW' ? 'text-amber-500' : 'text-gray-400', []);
@@ -156,6 +159,28 @@ export default function DashboardPage() {
     }
   }, [loadUserAssets]);
 
+  const handlePopulateSymbols = useCallback(async () => {
+    setPopulateError(null);
+    setPopulateSuccess(null);
+    setPopulateLoading(true);
+    try {
+      const res = await triggerPopulateSymbols(cronSecretInput.trim() || undefined);
+      const parts: string[] = [];
+      if (res.results) {
+        for (const [k, v] of Object.entries(res.results)) {
+          parts.push(`${k}: ${v}`);
+        }
+      }
+      setPopulateSuccess(t('dashboard.populateSuccess') + (parts.length > 0 ? ` (${parts.join(', ')})` : ''));
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      if (msg.includes('Cron secret required')) setCronSecretPrompt(true);
+      else setPopulateError(msg);
+    } finally {
+      setPopulateLoading(false);
+    }
+  }, [cronSecretInput, t]);
+
   const handleRemoveAsset = useCallback(async (id: string) => {
     const client = getSupabaseBrowser();
     if (!client) return;
@@ -236,6 +261,10 @@ export default function DashboardPage() {
     recsError={recsError}
     aiRecommendations={aiRecommendations}
     hasLlmKey={hasLlmKey}
+    handlePopulateSymbols={handlePopulateSymbols}
+    populateLoading={populateLoading}
+    populateSuccess={populateSuccess}
+    populateError={populateError}
     setHoveredCard={setHoveredCard}
     hoveredCard={hoveredCard}
   />;
