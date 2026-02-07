@@ -7,6 +7,9 @@
 [build.environment]
   NODE_VERSION = "20"
 
+[functions."populate-symbols"]
+  timeout = 60
+
 # Next.js: use framework detection or set NEXT_PUBLIC_API_URL in Netlify UI to your site URL (same-origin /api)
 # API and run-jobs run as Netlify Functions; /api/* is rewritten to the api function
 [[redirects]]
