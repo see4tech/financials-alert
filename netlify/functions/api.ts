@@ -184,15 +184,20 @@ async function getRecommendationsFromOpenAI(
   apiKey: string,
   dashboardSummary: string,
   assetsWithPrices: { symbol: string; asset_type: string; price: number | null }[],
-  locale = 'en',
-): Promise<Array<{ symbol: string; action: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning?: string }>> {
+  _locale = 'en',
+): Promise<Array<{ symbol: string; action_en: string; action_es: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning_en?: string; reasoning_es?: string }>> {
   const assetsText = assetsWithPrices
     .map((a) => `${a.symbol} (${a.asset_type}): ${a.price != null ? a.price : 'price unknown'}`)
     .join('\n');
-  const langName = LOCALE_NAMES[locale] || 'English';
-  const prompt = `You are a financial assistant. Given the following market context and asset list with current prices, recommend for EACH asset: action (buy, sell, or hold), entry_price, exit_price, take_profit, stop_loss (all as numbers), and a short reasoning.
+  const prompt = `You are a financial assistant. Given the following market context and asset list with current prices, recommend for EACH asset: action, entry_price, exit_price, take_profit, stop_loss (all as numbers), and a short reasoning in BOTH English and Spanish.
 
-IMPORTANT: Write the "reasoning" field and the "action" field value in ${langName}. For action use: ${locale === 'es' ? '"comprar", "vender", or "mantener"' : '"buy", "sell", or "hold"'}.
+For each asset provide these keys:
+- symbol (exact symbol from the list)
+- action_en: "buy", "sell", or "hold"
+- action_es: "comprar", "vender", or "mantener"
+- entry_price, exit_price, take_profit, stop_loss (numbers)
+- reasoning_en: 1-sentence reasoning in English
+- reasoning_es: 1-sentence reasoning in Spanish
 
 Market context:
 ${dashboardSummary}
@@ -200,7 +205,7 @@ ${dashboardSummary}
 Assets and current prices:
 ${assetsText}
 
-Respond with a JSON array only, one object per asset, with keys: symbol, action, entry_price, exit_price, take_profit, stop_loss, reasoning. Use the exact symbol from the list. If price is unknown, still suggest levels.`;
+Respond with a JSON array only, one object per asset. If price is unknown, still suggest levels.`;
 
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -997,7 +1002,7 @@ async function getApp(): Promise<express.Express> {
       }
       console.log('[recommendations] assetsWithPrices:', JSON.stringify(assetsWithPrices));
       const provider = (llmRow.provider as string) || 'openai';
-      let recommendations: Array<{ symbol: string; action: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning?: string }>;
+      let recommendations: Array<{ symbol: string; action_en: string; action_es: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning_en?: string; reasoning_es?: string }>;
       if (provider === 'openai') {
         recommendations = await getRecommendationsFromOpenAI(llmRow.api_key, dashboardSummary, assetsWithPrices, userLocale);
       } else {

@@ -435,23 +435,27 @@ export function DashboardContent(props: DashboardContentProps) {
             <section>
               <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('dashboard.recommendationsTitle')}</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {aiRecommendations.map((rec, i) => (
-                  <div key={rec.symbol + String(i)} className="cb-card-hover p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-semibold text-slate-900 dark:text-slate-100">{rec.symbol}</span>
-                      <span className={`text-sm font-semibold px-2.5 py-0.5 rounded-full ${/buy|comprar/i.test(rec.action) ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : /sell|vender/i.test(rec.action) ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
-                        {rec.action}
-                      </span>
+                {aiRecommendations.map((rec, i) => {
+                  const action = (locale === 'es' ? rec.action_es : rec.action_en) || rec.action_en || rec.action_es || rec.action || '';
+                  const reasoning = (locale === 'es' ? rec.reasoning_es : rec.reasoning_en) || rec.reasoning_en || rec.reasoning_es || rec.reasoning;
+                  return (
+                    <div key={rec.symbol + String(i)} className="cb-card-hover p-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-semibold text-slate-900 dark:text-slate-100">{rec.symbol}</span>
+                        <span className={`text-sm font-semibold px-2.5 py-0.5 rounded-full ${/buy|comprar/i.test(action) ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : /sell|vender/i.test(action) ? 'bg-red-50 text-red-700 dark:bg-red-900/30 dark:text-red-400' : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-400'}`}>
+                          {action}
+                        </span>
+                      </div>
+                      <dl className="text-sm space-y-0.5 text-slate-700 dark:text-slate-300">
+                        {rec.entry_price != null && <div><dt className="inline font-medium">{t('dashboard.entryPrice')}:</dt> <dd className="inline">{rec.entry_price}</dd></div>}
+                        {rec.exit_price != null && <div><dt className="inline font-medium">{t('dashboard.exitPrice')}:</dt> <dd className="inline">{rec.exit_price}</dd></div>}
+                        {rec.take_profit != null && <div><dt className="inline font-medium text-emerald-700 dark:text-emerald-400">{t('dashboard.takeProfit')}:</dt> <dd className="inline text-emerald-700 dark:text-emerald-400">{rec.take_profit}</dd></div>}
+                        {rec.stop_loss != null && <div><dt className="inline font-medium text-red-700 dark:text-red-400">{t('dashboard.stopLoss')}:</dt> <dd className="inline text-red-700 dark:text-red-400">{rec.stop_loss}</dd></div>}
+                      </dl>
+                      {reasoning && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">{reasoning}</p>}
                     </div>
-                    <dl className="text-sm space-y-0.5 text-slate-700 dark:text-slate-300">
-                      {rec.entry_price != null && <div><dt className="inline font-medium">{t('dashboard.entryPrice')}:</dt> <dd className="inline">{rec.entry_price}</dd></div>}
-                      {rec.exit_price != null && <div><dt className="inline font-medium">{t('dashboard.exitPrice')}:</dt> <dd className="inline">{rec.exit_price}</dd></div>}
-                      {rec.take_profit != null && <div><dt className="inline font-medium text-emerald-700 dark:text-emerald-400">{t('dashboard.takeProfit')}:</dt> <dd className="inline text-emerald-700 dark:text-emerald-400">{rec.take_profit}</dd></div>}
-                      {rec.stop_loss != null && <div><dt className="inline font-medium text-red-700 dark:text-red-400">{t('dashboard.stopLoss')}:</dt> <dd className="inline text-red-700 dark:text-red-400">{rec.stop_loss}</dd></div>}
-                    </dl>
-                    {rec.reasoning && <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">{rec.reasoning}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </section>
           )}

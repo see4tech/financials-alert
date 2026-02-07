@@ -136,11 +136,15 @@ export async function saveUserPreferences(
 export type AiRecommendation = {
   symbol: string;
   action: string;
+  action_en?: string;
+  action_es?: string;
   entry_price?: number;
   exit_price?: number;
   take_profit?: number;
   stop_loss?: number;
   reasoning?: string;
+  reasoning_en?: string;
+  reasoning_es?: string;
 };
 
 export async function fetchRecommendations(accessToken: string, locale = 'en'): Promise<{ recommendations: AiRecommendation[] }> {
