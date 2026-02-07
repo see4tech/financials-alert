@@ -262,7 +262,7 @@ async function fetchNasdaqScreener(
   try {
     const url = `https://api.nasdaq.com/api/screener/${tableType}?tableonly=true&limit=${limit}&offset=0`;
     const res = await fetchWithTimeout(url, {
-      timeout: 6000,
+      timeout: 4000,
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         Accept: 'application/json, text/plain, */*',
@@ -328,7 +328,7 @@ async function fetchNasdaqScreener(
       try {
         const syms = chunk.map((s) => s.symbol).join(',');
         const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(syms)}&apikey=${twelveDataKey}`;
-        const res = await fetchWithTimeout(url, { timeout: 6000 });
+        const res = await fetchWithTimeout(url, { timeout: 4000 });
         if (!res.ok) return chunk.map((s) => ({ ...s, pct: 0, close: undefined as number | undefined, high52: undefined as number | undefined }));
         const data = (await res.json()) as Record<string, {
           symbol?: string; name?: string; percent_change?: string; close?: string;
@@ -382,7 +382,7 @@ async function fetchNasdaqScreener(
 async function fetchCoinGeckoTop(limit = 30): Promise<ScanCandidate[]> {
   try {
     const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${limit}&page=1&sparkline=false&price_change_percentage=7d`;
-    const res = await fetchWithTimeout(url, { timeout: 6000 });
+    const res = await fetchWithTimeout(url, { timeout: 4000 });
     if (!res.ok) {
       console.warn(`[market-scan] CoinGecko ${res.status}`);
       return [];
@@ -417,7 +417,7 @@ async function fetchCommodityQuotes(apiKey: string): Promise<ScanCandidate[]> {
   try {
     const symbols = [...new Set(COMMODITY_SYMBOLS)].join(',');
     const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbols)}&apikey=${apiKey}`;
-    const res = await fetchWithTimeout(url, { timeout: 6000 });
+    const res = await fetchWithTimeout(url, { timeout: 4000 });
     if (!res.ok) {
       console.warn(`[market-scan] Twelve Data commodities ${res.status}`);
       return [];
@@ -457,7 +457,7 @@ async function fetchTwelveDataBatchQuotes(
   if (symbols.length === 0) return {};
   try {
     const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbols.join(','))}&apikey=${apiKey}`;
-    const res = await fetchWithTimeout(url, { timeout: 6000 });
+    const res = await fetchWithTimeout(url, { timeout: 4000 });
     if (!res.ok) return {};
     const data = (await res.json()) as Record<
       string,
@@ -541,7 +541,7 @@ function pickTopCandidates(candidates: ScanCandidate[], total = 20, minPerType =
 
 const VALID_ASSET_TYPES = ['stock', 'etf', 'commodity', 'crypto'] as const;
 
-/** Call OpenAI to select top N buying opportunities from the candidates. */
+/** Call OpenAI to provide analysis for pre-selected candidates. */
 async function getMarketScanFromOpenAI(
   apiKey: string,
   dashboardSummary: string,
@@ -568,32 +568,24 @@ async function getMarketScanFromOpenAI(
     reasoning?: string;
   }>
 > {
-  const langName = LOCALE_NAMES[locale] || 'English';
   const candidatesText = candidates
     .map(
       (c) =>
-        `${c.symbol} | ${c.name} | ${c.asset_type} | price: ${c.current_price ?? 'unknown'} | daily change: ${c.pct_change != null ? c.pct_change.toFixed(2) + '%' : 'unknown'} | 52w high: ${c.fifty_two_week_high ?? 'unknown'}`,
+        `${c.symbol}|${c.asset_type}|${c.current_price ?? '?'}|${c.pct_change != null ? c.pct_change.toFixed(1) + '%' : '?'}`,
     )
     .join('\n');
-  const prompt = `You are a financial assistant. Given the following market context and ${candidates.length} screening candidates, select the TOP ${count} best buying opportunities right now.
+  const prompt = `Financial analyst. For each asset below, provide entry_price, take_profit, stop_loss (numbers), and 1-sentence reasoning in English (reasoning_en) and Spanish (reasoning_es).
 
-For each pick provide: symbol, name, asset_type, action ("buy"), current_price, entry_price (suggested entry), take_profit, stop_loss, and a brief reasoning (1–2 sentences) in BOTH English and Spanish.
+Context: ${dashboardSummary}
 
-CRITICAL RULES:
-- All price fields (current_price, entry_price, take_profit, stop_loss) MUST be numbers (e.g. 150.25). NEVER use text, null, or "unknown". Estimate if unknown.
-- Provide reasoning in BOTH languages: "reasoning_en" (English, 1-2 sentences) and "reasoning_es" (Spanish, 1-2 sentences).
-- Keep reasoning concise. No currency symbols in price fields.
-
-Market context:
-${dashboardSummary}
-
-Candidates:
+Assets (symbol|type|price|change):
 ${candidatesText}
 
-Respond with a JSON object containing a "picks" array of exactly ${count} objects, each with keys: symbol (string), name (string), asset_type (string), action (string "buy"), current_price (number), entry_price (number), take_profit (number), stop_loss (number), reasoning_en (string in English), reasoning_es (string in Spanish).`;
+Return JSON: {"picks":[{symbol,name,asset_type,action:"buy",current_price,entry_price,take_profit,stop_loss,reasoning_en,reasoning_es}]}
+All prices MUST be numbers. Estimate if unknown. Exactly ${count} items.`;
 
   const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
-    timeout: 28000,
+    timeout: 22000,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -603,6 +595,7 @@ Respond with a JSON object containing a "picks" array of exactly ${count} object
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
+      max_tokens: Math.min(count * 200, 3000),
     }),
   });
   if (!res.ok) {
@@ -1077,54 +1070,35 @@ async function getApp(): Promise<express.Express> {
         try { return await fn(); } catch (e) { console.warn(`[market-scan] ${label} failed:`, e instanceof Error ? e.message : e); return []; }
       };
       const [stocks, etfs, crypto, commodities, dashboard] = await Promise.all([
-        assetTypes.includes('stock') ? safeResolve(() => fetchNasdaqScreener('stocks', 100, twelveDataKey), 'stocks') : Promise.resolve([] as ScanCandidate[]),
-        assetTypes.includes('etf') ? safeResolve(() => fetchNasdaqScreener('etf', 50, twelveDataKey), 'etfs') : Promise.resolve([] as ScanCandidate[]),
-        assetTypes.includes('crypto') ? safeResolve(() => fetchCoinGeckoTop(30), 'crypto') : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('stock') ? safeResolve(() => fetchNasdaqScreener('stocks', 60, twelveDataKey), 'stocks') : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('etf') ? safeResolve(() => fetchNasdaqScreener('etf', 30, twelveDataKey), 'etfs') : Promise.resolve([] as ScanCandidate[]),
+        assetTypes.includes('crypto') ? safeResolve(() => fetchCoinGeckoTop(20), 'crypto') : Promise.resolve([] as ScanCandidate[]),
         assetTypes.includes('commodity') && twelveDataKey ? safeResolve(() => fetchCommodityQuotes(twelveDataKey), 'commodities') : Promise.resolve([] as ScanCandidate[]),
         dashboardService.getToday('UTC'),
       ]);
-      console.log(`[market-scan] Phase 1 results: stocks=${stocks.length}, etfs=${etfs.length}, crypto=${crypto.length}, commodities=${commodities.length}`);
+      console.log(`[market-scan] Phase 1 done in ${Date.now()}ms: stocks=${stocks.length}, etfs=${etfs.length}, crypto=${crypto.length}, commodities=${commodities.length}`);
 
       const allCandidates = [...stocks, ...etfs, ...crypto, ...commodities];
       if (allCandidates.length === 0) {
         return res.status(500).json({ error: 'Could not fetch screening data from any source.' });
       }
 
-      // Phase 2: Algorithmic scoring
-      console.log('[market-scan] Phase 2: scoring...');
+      // Phase 2: Algorithmic scoring – pick exactly `count` candidates (no extra for AI)
       scoreCandidates(allCandidates);
-      // Pick slightly more than requested to give AI some choice, but not too many (to keep prompt small)
-      const pickCount = Math.min(count + 5, 20);
-      const topPicked = pickTopCandidates(allCandidates, pickCount, Math.min(2, Math.floor(count / 2)));
-      console.log('[market-scan] Top picked:', topPicked.map((c) => `${c.symbol}(${c.asset_type}:${c.score.toFixed(1)})`).join(', '));
+      const topPicked = pickTopCandidates(allCandidates, count, Math.min(2, Math.floor(count / 2)));
+      console.log('[market-scan] Phase 2: picked', topPicked.map((c) => `${c.symbol}(${c.asset_type})`).join(', '));
 
-      // Phase 3: Fetch detailed quotes only for candidates missing price data
-      // Wrapped safely – missing quotes are not fatal; AI can still work without exact prices
-      const needQuotes = topPicked.filter((c) => c.asset_type !== 'crypto' && c.current_price == null).map((c) => c.symbol);
-      if (needQuotes.length > 0 && twelveDataKey) {
-        console.log('[market-scan] Phase 3: fetching quotes for', needQuotes.length, 'symbols missing price data');
-        try {
-          const quotes = await fetchTwelveDataBatchQuotes(needQuotes, twelveDataKey);
-          for (const c of topPicked) {
-            const q = quotes[c.symbol];
-            if (q) {
-              if (q.close != null) c.current_price = q.close;
-              if (q.fifty_two_week_high != null) c.fifty_two_week_high = q.fifty_two_week_high;
-            }
-          }
-        } catch (e) {
-          console.warn('[market-scan] Phase 3 quote fetch failed (non-fatal):', e instanceof Error ? e.message : e);
-        }
-      }
+      // Skip Phase 3 (quote fetching) – AI can estimate prices from available data
+      // This saves 3-6 seconds which is critical for staying within the function timeout
 
-      // Build dashboard context
+      // Build dashboard context (compact)
       const indSummary = dashboard.indicators
-        .map((i: { key: string; status: string; trend: string; value?: number | null }) => `${i.key}: ${i.status} (${i.trend}), value: ${i.value ?? 'n/a'}`)
-        .join('\n');
-      const dashboardSummary = `Score: ${dashboard.score}, Delta week: ${dashboard.deltaWeek}. Scenario: bull=${dashboard.scenario.bull}, bear=${dashboard.scenario.bear}.\nIndicators:\n${indSummary}`;
+        .map((i: { key: string; status: string; trend: string }) => `${i.key}:${i.status}/${i.trend}`)
+        .join(', ');
+      const dashboardSummary = `Score:${dashboard.score} Δ:${dashboard.deltaWeek} Bull:${dashboard.scenario.bull} Bear:${dashboard.scenario.bear} [${indSummary}]`;
 
-      // Phase 4: AI refinement
-      console.log(`[market-scan] Phase 4: calling OpenAI for top ${count} picks from ${topPicked.length} candidates...`);
+      // Phase 3: AI analysis (the only slow step now)
+      console.log(`[market-scan] Phase 3: calling OpenAI for ${count} picks...`);
       const scan = await getMarketScanFromOpenAI(
         llmRow.api_key,
         dashboardSummary,
