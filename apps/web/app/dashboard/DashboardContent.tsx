@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { NavBar } from '@/app/components/NavBar';
 import { AssetSearch } from '@/app/components/AssetSearch';
-import type { AiRecommendation } from '@/lib/api';
+import type { AiRecommendation, MarketScanResult } from '@/lib/api';
 
 type Indicator = { key: string; value?: number; trend: string; status: string; explain?: string; ma21d?: number; referenceText?: string };
 type Recommendation = { id: string; tickers?: string[] };
@@ -56,6 +56,10 @@ export type DashboardContentProps = {
   populateError: string | null;
   setHoveredCard: (v: string | null) => void;
   hoveredCard: string | null;
+  handleMarketScan: () => void;
+  scanLoading: boolean;
+  scanResults: MarketScanResult[] | null;
+  scanError: string | null;
 };
 
 export function DashboardContent(props: DashboardContentProps) {
@@ -99,6 +103,10 @@ export function DashboardContent(props: DashboardContentProps) {
     populateError,
     setHoveredCard,
     hoveredCard,
+    handleMarketScan,
+    scanLoading,
+    scanResults,
+    scanError,
   } = props;
 
   return (
@@ -353,19 +361,79 @@ export function DashboardContent(props: DashboardContentProps) {
         </>
       )}
       {userAssets.length === 0 && <p className="text-sm text-gray-500 mb-6">{t('dashboard.noAssetsHint')}</p>}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      {/* Populate symbols button hidden – symbols already loaded */}
+      {/* ── Market Scanner ── */}
+      <div className="mt-6 mb-8">
+        <h2 className="text-xl font-semibold mb-2">{t('dashboard.scanResults')}</h2>
+        <p className="text-sm text-gray-600 mb-3">{t('dashboard.scanMarketHint')}</p>
         <button
           type="button"
-          onClick={handlePopulateSymbols}
-          disabled={populateLoading}
-          className="rounded-lg bg-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-300 disabled:opacity-50"
-          title={t('dashboard.populateSymbolsHint')}
+          onClick={handleMarketScan}
+          disabled={scanLoading}
+          className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 mb-4"
         >
-          {populateLoading ? t('common.loading') : t('dashboard.populateSymbols')}
+          {scanLoading ? t('common.loading') : t('dashboard.scanMarket')}
         </button>
-        {populateSuccess && <span className="text-xs text-green-600">{populateSuccess}</span>}
-        {populateError && <span className="text-xs text-red-600">{populateError}</span>}
+        {!hasLlmKey && <p className="text-xs text-gray-500 mb-2">{t('dashboard.configureLlmHint')}</p>}
+        {scanError && <p className="text-sm text-red-600 mb-4">{scanError}</p>}
+        {scanResults && scanResults.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {scanResults.map((item, i) => {
+              const typeKey = item.asset_type === 'stock' ? 'Stock' : item.asset_type === 'etf' ? 'Etf' : item.asset_type === 'commodity' ? 'Commodity' : 'Crypto';
+              const typeBadge =
+                item.asset_type === 'stock'
+                  ? 'bg-blue-100 text-blue-700'
+                  : item.asset_type === 'etf'
+                    ? 'bg-green-100 text-green-700'
+                    : item.asset_type === 'commodity'
+                      ? 'bg-amber-100 text-amber-700'
+                      : 'bg-purple-100 text-purple-700';
+              return (
+                <div key={item.symbol + String(i)} className="border rounded-lg p-4 bg-white shadow-sm">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-semibold text-lg">{item.symbol}</span>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${typeBadge}`}>
+                      {t('dashboard.assetType' + typeKey)}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2 truncate">{item.name}</p>
+                  {item.current_price != null && (
+                    <p className="text-sm mb-1">
+                      <span className="font-medium text-gray-700">{t('dashboard.currentPrice')}:</span>{' '}
+                      <span className="text-gray-900">${typeof item.current_price === 'number' ? item.current_price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : item.current_price}</span>
+                    </p>
+                  )}
+                  <dl className="text-sm space-y-0.5">
+                    {item.entry_price != null && (
+                      <div>
+                        <dt className="inline font-medium text-gray-700">{t('dashboard.entryPrice')}:</dt>{' '}
+                        <dd className="inline">${item.entry_price}</dd>
+                      </div>
+                    )}
+                    {item.take_profit != null && (
+                      <div>
+                        <dt className="inline font-medium text-green-700">{t('dashboard.takeProfit')}:</dt>{' '}
+                        <dd className="inline text-green-700">${item.take_profit}</dd>
+                      </div>
+                    )}
+                    {item.stop_loss != null && (
+                      <div>
+                        <dt className="inline font-medium text-red-700">{t('dashboard.stopLoss')}:</dt>{' '}
+                        <dd className="inline text-red-700">${item.stop_loss}</dd>
+                      </div>
+                    )}
+                  </dl>
+                  {item.reasoning && <p className="text-xs text-gray-600 mt-2 border-t border-gray-100 pt-2">{item.reasoning}</p>}
+                </div>
+              );
+            })}
+          </div>
+        )}
+        {scanResults && scanResults.length === 0 && !scanError && (
+          <p className="text-sm text-gray-500">{t('dashboard.scanEmpty')}</p>
+        )}
       </div>
+
       {recsError && <p className="text-sm text-red-600 mb-4">{recsError}</p>}
       {aiRecommendations && aiRecommendations.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">

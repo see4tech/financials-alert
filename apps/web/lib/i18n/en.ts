@@ -150,6 +150,11 @@ export const en = {
     actionBuy: 'Buy',
     actionSell: 'Sell',
     actionHold: 'Hold',
+    scanMarket: 'Scan Market',
+    scanMarketHint: 'Scan stocks, ETFs, commodities and crypto across the market to find the top 5 buying opportunities using AI analysis.',
+    scanResults: 'Market Scanner',
+    scanEmpty: 'No scan results found. Try again later.',
+    currentPrice: 'Current price',
     recommendations: {
       buy_etf: 'Consider investing in funds that track the market (e.g. QQQ, SPY)',
       buy_etf_desc: 'Conditions support putting some money in the stock market in a diversified way.',

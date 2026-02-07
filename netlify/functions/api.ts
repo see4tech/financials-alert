@@ -77,6 +77,12 @@ async function fetchPrice(symbol: string, assetType: string): Promise<number | n
   return Number.isNaN(n) ? null : n;
 }
 
+// ── Hardcoded commodity symbols for market scan ──
+const COMMODITY_SYMBOLS = [
+  'CL', 'GC', 'NG', 'SI', 'HG', 'PL', 'PA', 'ZC', 'ZW', 'ZS',
+  'KC', 'CT', 'SB', 'CC', 'LBS', 'LE', 'HE', 'OJ', 'RB', 'HO', 'BZ', 'NG',
+];
+
 const LOCALE_NAMES: Record<string, string> = { en: 'English', es: 'Spanish' };
 
 /** Call OpenAI chat completions with user's API key. Returns parsed JSON array of recommendations. */
@@ -138,6 +144,308 @@ Respond with a JSON array only, one object per asset, with keys: symbol, action,
     console.warn('OpenAI: no array found in response, raw:', content.slice(0, 500));
   }
   return list as Array<{ symbol: string; action: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning?: string }>;
+}
+
+// ── Market Scan types & helpers ──
+type ScanCandidate = {
+  symbol: string;
+  name: string;
+  asset_type: string;
+  pct_change: number;
+  score: number;
+  current_price?: number;
+  fifty_two_week_high?: number;
+};
+
+/** Fetch NASDAQ screener (stocks or etf). Free, no API key needed. */
+async function fetchNasdaqScreener(
+  tableType: 'stocks' | 'etf',
+  limit: number,
+): Promise<ScanCandidate[]> {
+  try {
+    const url = `https://api.nasdaq.com/api/screener/${tableType}?tableonly=true&limit=${limit}&offset=0`;
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        Accept: 'application/json',
+      },
+    });
+    if (!res.ok) {
+      console.warn(`[market-scan] NASDAQ screener ${tableType} ${res.status}`);
+      return [];
+    }
+    const json = (await res.json()) as {
+      data?: { table?: { rows?: Array<{ symbol?: string; name?: string; pctchange?: string; marketCap?: string; volume?: string }> } };
+    };
+    const rows = json?.data?.table?.rows ?? [];
+    return rows
+      .filter((r) => r.symbol && r.name)
+      .map((r) => {
+        const pct = parseFloat(String(r.pctchange ?? '0').replace(/[%,]/g, '')) || 0;
+        return {
+          symbol: r.symbol!.trim(),
+          name: r.name!.trim(),
+          asset_type: tableType === 'etf' ? 'etf' : 'stock',
+          pct_change: pct,
+          score: 0,
+        };
+      });
+  } catch (e) {
+    console.warn(`[market-scan] NASDAQ screener error (${tableType}):`, e);
+    return [];
+  }
+}
+
+/** Fetch top crypto from CoinGecko. Free, no key. */
+async function fetchCoinGeckoTop(limit = 50): Promise<ScanCandidate[]> {
+  try {
+    const url = `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=${limit}&page=1&sparkline=false&price_change_percentage=7d`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`[market-scan] CoinGecko ${res.status}`);
+      return [];
+    }
+    const data = (await res.json()) as Array<{
+      symbol?: string;
+      name?: string;
+      current_price?: number;
+      price_change_percentage_24h?: number;
+      price_change_percentage_7d_in_currency?: number;
+      ath?: number;
+    }>;
+    return data
+      .filter((c) => c.symbol && c.name)
+      .map((c) => ({
+        symbol: (c.symbol ?? '').toUpperCase(),
+        name: c.name ?? '',
+        asset_type: 'crypto',
+        pct_change: c.price_change_percentage_24h ?? 0,
+        score: 0,
+        current_price: c.current_price ?? undefined,
+        fifty_two_week_high: c.ath ?? undefined,
+      }));
+  } catch (e) {
+    console.warn('[market-scan] CoinGecko error:', e);
+    return [];
+  }
+}
+
+/** Fetch batch commodity quotes from Twelve Data. */
+async function fetchCommodityQuotes(apiKey: string): Promise<ScanCandidate[]> {
+  try {
+    const symbols = [...new Set(COMMODITY_SYMBOLS)].join(',');
+    const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbols)}&apikey=${apiKey}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn(`[market-scan] Twelve Data commodities ${res.status}`);
+      return [];
+    }
+    const data = (await res.json()) as Record<
+      string,
+      { symbol?: string; name?: string; percent_change?: string; close?: string; fifty_two_week?: { high?: string } }
+    >;
+    const results: ScanCandidate[] = [];
+    // When only one symbol, response is flat object; otherwise it's keyed by symbol
+    const entries = data.symbol ? [[data.symbol as unknown as string, data]] : Object.entries(data);
+    for (const [, val] of entries as [string, typeof data[string]][]) {
+      if (!val?.symbol) continue;
+      const pct = parseFloat(String(val.percent_change ?? '0')) || 0;
+      results.push({
+        symbol: val.symbol,
+        name: val.name ?? val.symbol,
+        asset_type: 'commodity',
+        pct_change: pct,
+        score: 0,
+        current_price: val.close ? parseFloat(val.close) || undefined : undefined,
+        fifty_two_week_high: val.fifty_two_week?.high ? parseFloat(val.fifty_two_week.high) || undefined : undefined,
+      });
+    }
+    return results;
+  } catch (e) {
+    console.warn('[market-scan] Twelve Data commodities error:', e);
+    return [];
+  }
+}
+
+/** Fetch batch quotes from Twelve Data for given symbols. Returns map symbol -> quote data. */
+async function fetchTwelveDataBatchQuotes(
+  symbols: string[],
+  apiKey: string,
+): Promise<Record<string, { close?: number; percent_change?: number; fifty_two_week_high?: number }>> {
+  if (symbols.length === 0) return {};
+  try {
+    const url = `https://api.twelvedata.com/quote?symbol=${encodeURIComponent(symbols.join(','))}&apikey=${apiKey}`;
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const data = (await res.json()) as Record<
+      string,
+      { symbol?: string; close?: string; percent_change?: string; fifty_two_week?: { high?: string } }
+    >;
+    const result: Record<string, { close?: number; percent_change?: number; fifty_two_week_high?: number }> = {};
+    // Single symbol: flat object. Multiple: keyed by symbol.
+    if (data.symbol && typeof data.symbol === 'string') {
+      const d = data as unknown as { symbol: string; close?: string; percent_change?: string; fifty_two_week?: { high?: string } };
+      result[d.symbol] = {
+        close: d.close ? parseFloat(d.close) || undefined : undefined,
+        percent_change: d.percent_change ? parseFloat(d.percent_change) || undefined : undefined,
+        fifty_two_week_high: d.fifty_two_week?.high ? parseFloat(d.fifty_two_week.high) || undefined : undefined,
+      };
+    } else {
+      for (const [sym, val] of Object.entries(data)) {
+        if (!val?.close) continue;
+        result[sym] = {
+          close: parseFloat(String(val.close)) || undefined,
+          percent_change: val.percent_change ? parseFloat(String(val.percent_change)) || undefined : undefined,
+          fifty_two_week_high: val.fifty_two_week?.high ? parseFloat(val.fifty_two_week.high) || undefined : undefined,
+        };
+      }
+    }
+    return result;
+  } catch {
+    return {};
+  }
+}
+
+/** Algorithmic scoring for market scan candidates. */
+function scoreCandidates(candidates: ScanCandidate[]): ScanCandidate[] {
+  for (const c of candidates) {
+    let score = 0;
+    // Positive daily price change = high weight
+    if (c.pct_change > 0) score += Math.min(c.pct_change * 10, 50); // cap at 50
+    // Not overbought: below 90% of 52-week high = medium weight
+    if (c.fifty_two_week_high && c.current_price) {
+      const ratio = c.current_price / c.fifty_two_week_high;
+      if (ratio < 0.9) score += 20;
+      else if (ratio < 0.95) score += 10;
+    }
+    // Penalize negative price change
+    if (c.pct_change < -5) score -= 20;
+    else if (c.pct_change < 0) score -= 5;
+    c.score = score;
+  }
+  return candidates;
+}
+
+/** Pick top N candidates ensuring a mix of asset types. At least minPerType from each available type. */
+function pickTopCandidates(candidates: ScanCandidate[], total = 20, minPerType = 2): ScanCandidate[] {
+  const sorted = [...candidates].sort((a, b) => b.score - a.score);
+  const types = [...new Set(sorted.map((c) => c.asset_type))];
+  const picked: ScanCandidate[] = [];
+  const pickedSymbols = new Set<string>();
+
+  // Ensure minimum from each type
+  for (const type of types) {
+    const ofType = sorted.filter((c) => c.asset_type === type);
+    let count = 0;
+    for (const c of ofType) {
+      if (count >= minPerType) break;
+      if (pickedSymbols.has(c.symbol)) continue;
+      picked.push(c);
+      pickedSymbols.add(c.symbol);
+      count++;
+    }
+  }
+
+  // Fill remaining from top scoring
+  for (const c of sorted) {
+    if (picked.length >= total) break;
+    if (pickedSymbols.has(c.symbol)) continue;
+    picked.push(c);
+    pickedSymbols.add(c.symbol);
+  }
+
+  return picked.slice(0, total);
+}
+
+/** Call OpenAI to select top 5 buying opportunities from the candidates. */
+async function getMarketScanFromOpenAI(
+  apiKey: string,
+  dashboardSummary: string,
+  candidates: Array<{
+    symbol: string;
+    name: string;
+    asset_type: string;
+    current_price?: number;
+    pct_change?: number;
+    fifty_two_week_high?: number;
+  }>,
+  locale = 'en',
+): Promise<
+  Array<{
+    symbol: string;
+    name: string;
+    asset_type: string;
+    action: string;
+    current_price?: number;
+    entry_price?: number;
+    take_profit?: number;
+    stop_loss?: number;
+    reasoning?: string;
+  }>
+> {
+  const langName = LOCALE_NAMES[locale] || 'English';
+  const candidatesText = candidates
+    .map(
+      (c) =>
+        `${c.symbol} | ${c.name} | ${c.asset_type} | price: ${c.current_price ?? 'unknown'} | daily change: ${c.pct_change != null ? c.pct_change.toFixed(2) + '%' : 'unknown'} | 52w high: ${c.fifty_two_week_high ?? 'unknown'}`,
+    )
+    .join('\n');
+  const prompt = `You are a financial assistant. Given the following market context and 20 screening candidates, select the TOP 5 best buying opportunities right now.
+
+For each pick provide: symbol, name, asset_type, action ("buy"), entry_price (suggested entry), take_profit, stop_loss, and a short reasoning (2–3 sentences).
+
+IMPORTANT: Write the "reasoning" field and all text in ${langName}.
+
+Market context:
+${dashboardSummary}
+
+Candidates:
+${candidatesText}
+
+Respond with a JSON object containing a "picks" array of exactly 5 objects, each with keys: symbol, name, asset_type, action, current_price, entry_price, take_profit, stop_loss, reasoning.`;
+
+  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [{ role: 'user', content: prompt }],
+      response_format: { type: 'json_object' },
+    }),
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(`OpenAI: ${res.status} ${err}`);
+  }
+  const data = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+  const content = data.choices?.[0]?.message?.content;
+  if (!content) throw new Error('OpenAI: empty response');
+  const parsed = JSON.parse(content) as Record<string, unknown>;
+  let list: unknown[] = [];
+  if (Array.isArray(parsed)) {
+    list = parsed;
+  } else if (typeof parsed === 'object' && parsed !== null) {
+    for (const val of Object.values(parsed)) {
+      if (Array.isArray(val) && val.length > 0) {
+        list = val;
+        break;
+      }
+    }
+  }
+  return list as Array<{
+    symbol: string;
+    name: string;
+    asset_type: string;
+    action: string;
+    current_price?: number;
+    entry_price?: number;
+    take_profit?: number;
+    stop_loss?: number;
+    reasoning?: string;
+  }>;
 }
 
 let app: express.Express | null = null;
@@ -499,6 +807,111 @@ async function getApp(): Promise<express.Express> {
       return res.json({ recommendations });
     } catch (e) {
       console.error('/api/recommendations error:', e);
+      return res.status(500).json({ error: errorMessage(e) });
+    }
+  });
+
+  // ── Market Scan ──
+  app.post('/api/market-scan', async (req: Request, res: Response) => {
+    try {
+      console.log('[market-scan] handler start');
+      const userId = await getUserIdFromRequest(req);
+      if (!userId) {
+        console.warn('[market-scan] auth failed – no userId');
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+      const supabase = getSupabaseService();
+      const { data: llmRow, error: llmErr } = await supabase
+        .from('user_llm_settings')
+        .select('provider, api_key')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (llmErr) console.error('[market-scan] user_llm_settings query error', llmErr);
+      if (!llmRow?.api_key) {
+        return res.status(400).json({ error: 'Configure your AI provider and API key in Settings first.' });
+      }
+      const provider = (llmRow.provider as string) || 'openai';
+      if (provider !== 'openai') {
+        return res.status(400).json({ error: `Provider "${provider}" is not yet supported for market scan. Use OpenAI in Settings.` });
+      }
+
+      // Read locale
+      const bodyLocale = req.body?.locale;
+      let userLocale = 'en';
+      if (typeof bodyLocale === 'string' && ['en', 'es'].includes(bodyLocale)) {
+        userLocale = bodyLocale;
+      } else {
+        const { data: prefRow } = await supabase
+          .from('user_preferences')
+          .select('locale')
+          .eq('user_id', userId)
+          .maybeSingle();
+        userLocale = (prefRow?.locale as string) || 'en';
+      }
+      console.log('[market-scan] locale:', userLocale);
+
+      // Phase 1: Fetch screening data in parallel
+      const twelveDataKey = process.env.TWELVE_DATA_API_KEY || '';
+      console.log('[market-scan] Phase 1: fetching screening data...');
+      const [stocks, etfs, crypto, commodities] = await Promise.all([
+        fetchNasdaqScreener('stocks', 200),
+        fetchNasdaqScreener('etf', 100),
+        fetchCoinGeckoTop(50),
+        twelveDataKey ? fetchCommodityQuotes(twelveDataKey) : Promise.resolve([] as ScanCandidate[]),
+      ]);
+      console.log(`[market-scan] Phase 1 results: stocks=${stocks.length}, etfs=${etfs.length}, crypto=${crypto.length}, commodities=${commodities.length}`);
+
+      const allCandidates = [...stocks, ...etfs, ...crypto, ...commodities];
+      if (allCandidates.length === 0) {
+        return res.status(500).json({ error: 'Could not fetch screening data from any source.' });
+      }
+
+      // Phase 2: Algorithmic scoring
+      console.log('[market-scan] Phase 2: scoring...');
+      scoreCandidates(allCandidates);
+      const top20 = pickTopCandidates(allCandidates, 20, 2);
+      console.log('[market-scan] Top 20 picked:', top20.map((c) => `${c.symbol}(${c.asset_type}:${c.score.toFixed(1)})`).join(', '));
+
+      // Phase 3: Fetch detailed quotes for non-crypto candidates from Twelve Data
+      const nonCryptoSymbols = top20.filter((c) => c.asset_type !== 'crypto').map((c) => c.symbol);
+      if (nonCryptoSymbols.length > 0 && twelveDataKey) {
+        console.log('[market-scan] Phase 3: fetching detailed quotes for', nonCryptoSymbols.length, 'symbols');
+        const quotes = await fetchTwelveDataBatchQuotes(nonCryptoSymbols, twelveDataKey);
+        for (const c of top20) {
+          const q = quotes[c.symbol];
+          if (q) {
+            if (q.close != null) c.current_price = q.close;
+            if (q.fifty_two_week_high != null) c.fifty_two_week_high = q.fifty_two_week_high;
+          }
+        }
+      }
+
+      // Build dashboard context
+      const dashboard = await dashboardService.getToday('UTC');
+      const indSummary = dashboard.indicators
+        .map((i: { key: string; status: string; trend: string; value?: number | null }) => `${i.key}: ${i.status} (${i.trend}), value: ${i.value ?? 'n/a'}`)
+        .join('\n');
+      const dashboardSummary = `Score: ${dashboard.score}, Delta week: ${dashboard.deltaWeek}. Scenario: bull=${dashboard.scenario.bull}, bear=${dashboard.scenario.bear}.\nIndicators:\n${indSummary}`;
+
+      // Phase 3 (cont): AI refinement
+      console.log('[market-scan] Phase 3: calling OpenAI for top 5 picks...');
+      const scan = await getMarketScanFromOpenAI(
+        llmRow.api_key,
+        dashboardSummary,
+        top20.map((c) => ({
+          symbol: c.symbol,
+          name: c.name,
+          asset_type: c.asset_type,
+          current_price: c.current_price,
+          pct_change: c.pct_change,
+          fifty_two_week_high: c.fifty_two_week_high,
+        })),
+        userLocale,
+      );
+      console.log('[market-scan] result count:', scan.length);
+      return res.json({ scan });
+    } catch (e) {
+      console.error('/api/market-scan error:', e);
       return res.status(500).json({ error: errorMessage(e) });
     }
   });

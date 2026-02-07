@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useLocale } from '@/app/context/LocaleContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
-import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, getLlmSettings, type AiRecommendation } from '@/lib/api';
+import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, fetchMarketScan, getLlmSettings, type AiRecommendation, type MarketScanResult } from '@/lib/api';
 import { DashboardContent } from './DashboardContent';
 import { DashboardErrorView } from './DashboardErrorView';
 
@@ -47,6 +47,9 @@ export default function DashboardPage() {
   const [populateLoading, setPopulateLoading] = useState(false);
   const [populateSuccess, setPopulateSuccess] = useState<string | null>(null);
   const [populateError, setPopulateError] = useState<string | null>(null);
+  const [scanLoading, setScanLoading] = useState(false);
+  const [scanResults, setScanResults] = useState<MarketScanResult[] | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   const statusIconColor = useCallback((s: string): string =>
     s === 'GREEN' ? 'text-green-600' : s === 'RED' ? 'text-red-600' : s === 'YELLOW' ? 'text-amber-500' : 'text-gray-400', []);
@@ -212,6 +215,30 @@ export default function DashboardPage() {
     }
   }, [locale]);
 
+  const handleMarketScan = useCallback(async () => {
+    const client = getSupabaseBrowser();
+    if (!client) return;
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.access_token) return;
+    setScanError(null);
+    setScanLoading(true);
+    setScanResults(null);
+    try {
+      const result = await fetchMarketScan(session.access_token, locale);
+      console.log('[market-scan] raw response:', JSON.stringify(result));
+      const items = result.scan || [];
+      setScanResults(items);
+      if (items.length === 0) {
+        setScanError('No scan results returned. Check Netlify function logs and your LLM API key in Settings.');
+      }
+    } catch (e) {
+      console.error('[market-scan] client error:', e);
+      setScanError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setScanLoading(false);
+    }
+  }, [locale]);
+
   if (loading) return <div className="p-8">{t('common.loading')}</div>;
   if (error) {
     return <DashboardErrorView
@@ -267,5 +294,9 @@ export default function DashboardPage() {
     populateError={populateError}
     setHoveredCard={setHoveredCard}
     hoveredCard={hoveredCard}
+    handleMarketScan={handleMarketScan}
+    scanLoading={scanLoading}
+    scanResults={scanResults}
+    scanError={scanError}
   />;
 }

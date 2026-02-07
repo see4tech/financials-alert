@@ -161,6 +161,40 @@ export async function fetchRecommendations(accessToken: string, locale = 'en'): 
   }
 }
 
+// ── Market Scan ──
+export type MarketScanResult = {
+  symbol: string;
+  name: string;
+  asset_type: string;
+  action?: string;
+  current_price?: number;
+  entry_price?: number;
+  take_profit?: number;
+  stop_loss?: number;
+  reasoning?: string;
+};
+
+export async function fetchMarketScan(
+  accessToken: string,
+  locale = 'en',
+): Promise<{ scan: MarketScanResult[] }> {
+  const res = await fetch(`${API_BASE}/api/market-scan`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ locale }),
+  });
+  await throwOnNotOk(res);
+  const text = await res.text();
+  try {
+    const json = JSON.parse(text) as { scan?: MarketScanResult[]; error?: string };
+    if (json.error) throw new Error(json.error);
+    return { scan: json.scan || [] };
+  } catch (e) {
+    console.error('[fetchMarketScan] failed to parse response:', text.slice(0, 500));
+    throw e;
+  }
+}
+
 // ── Symbol search ──
 export type SymbolResult = { symbol: string; name: string; asset_type: string; exchange: string | null };
 

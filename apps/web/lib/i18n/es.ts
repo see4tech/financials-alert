@@ -153,6 +153,11 @@ export const es: typeof en = {
     actionBuy: 'Comprar',
     actionSell: 'Vender',
     actionHold: 'Mantener',
+    scanMarket: 'Escanear mercado',
+    scanMarketHint: 'Escanea acciones, ETFs, materias primas y cripto en todo el mercado para encontrar las 5 mejores oportunidades de compra usando análisis de IA.',
+    scanResults: 'Escáner de mercado',
+    scanEmpty: 'No se encontraron resultados. Intenta de nuevo más tarde.',
+    currentPrice: 'Precio actual',
     recommendations: {
       buy_etf: 'Considera invertir en fondos que replican el mercado (p. ej. QQQ, SPY)',
       buy_etf_desc: 'Las condiciones apoyan poner algo de dinero en bolsa de forma diversificada.',
