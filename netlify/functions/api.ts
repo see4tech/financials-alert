@@ -1293,7 +1293,10 @@ async function getApp(): Promise<express.Express> {
         trend = green >= 3 ? 'RISING' : red >= 2 ? 'FALLING' : 'FLAT';
         explanation = `${green} leaders green, ${red} red`;
       } else {
-        const stalenessMs = indConfig.poll_interval_sec * 3 * 1000;
+        // Daily indicators (poll_interval >= 1 day) often have 1–2 day lag from source; use at least 7 days so we don't mark "Data stale" right after a successful run
+        const baseStalenessMs = indConfig.poll_interval_sec * 3 * 1000;
+        const minStalenessForDaily = 7 * 24 * 60 * 60 * 1000;
+        const stalenessMs = indConfig.poll_interval_sec >= 86400 ? Math.max(baseStalenessMs, minStalenessForDaily) : baseStalenessMs;
         const since = new Date(Date.now() - (indConfig.trend_window_days + 5) * 24 * 60 * 60 * 1000);
         const points = await pointsRepo.find({
           where: { indicator_key: indicatorKey, ts: MoreThanOrEqual(since), granularity: '1d' },

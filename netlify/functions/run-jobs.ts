@@ -224,7 +224,9 @@ export const handler: Handler = async (event: HandlerEvent, context: HandlerCont
 
     const config = registry.getByKey(key);
     if (!config) continue;
-    const stalenessMs = config.poll_interval_sec * 3 * 1000;
+    const baseStalenessMs = config.poll_interval_sec * 3 * 1000;
+    const minStalenessForDaily = 7 * 24 * 60 * 60 * 1000;
+    const stalenessMs = config.poll_interval_sec >= 86400 ? Math.max(baseStalenessMs, minStalenessForDaily) : baseStalenessMs;
     const since = new Date(Date.now() - (config.trend_window_days + 5) * 24 * 60 * 60 * 1000);
     const points = await pointsRepo.find({
       where: { indicator_key: key, ts: MoreThanOrEqual(since), granularity: '1d' },
