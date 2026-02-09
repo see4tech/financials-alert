@@ -148,20 +148,34 @@ export type AiRecommendation = {
 };
 
 export async function fetchRecommendations(accessToken: string, locale = 'en'): Promise<{ recommendations: AiRecommendation[] }> {
-  const res = await fetch(`${API_BASE}/api/recommendations`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-    body: JSON.stringify({ locale }),
-  });
-  await throwOnNotOk(res);
-  const text = await res.text();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 45000);
   try {
-    const json = JSON.parse(text) as { recommendations?: AiRecommendation[]; error?: string };
-    if (json.error) throw new Error(json.error);
-    return { recommendations: json.recommendations || [] };
+    const res = await fetch(`${API_BASE}/api/recommendations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ locale }),
+      signal: controller.signal,
+    });
+    await throwOnNotOk(res);
+    const text = await res.text();
+    try {
+      const json = JSON.parse(text) as { recommendations?: AiRecommendation[]; error?: string };
+      if (json.error) throw new Error(json.error);
+      return { recommendations: json.recommendations || [] };
+    } catch (e) {
+      console.error('[fetchRecommendations] failed to parse response:', text.slice(0, 500));
+      throw e;
+    }
   } catch (e) {
-    console.error('[fetchRecommendations] failed to parse response:', text.slice(0, 500));
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      throw new Error(locale === 'es'
+        ? 'La solicitud tardó demasiado. Intenta de nuevo o reduce la cantidad de activos.'
+        : 'Request timed out. Try again or reduce the number of assets.');
+    }
     throw e;
+  } finally {
+    clearTimeout(timer);
   }
 }
 

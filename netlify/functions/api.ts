@@ -187,27 +187,17 @@ async function getRecommendationsFromOpenAI(
   _locale = 'en',
 ): Promise<Array<{ symbol: string; action_en: string; action_es: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning_en?: string; reasoning_es?: string }>> {
   const assetsText = assetsWithPrices
-    .map((a) => `${a.symbol} (${a.asset_type}): ${a.price != null ? a.price : 'price unknown'}`)
-    .join('\n');
-  const prompt = `You are a financial assistant. Given the following market context and asset list with current prices, recommend for EACH asset: action, entry_price, exit_price, take_profit, stop_loss (all as numbers), and a short reasoning in BOTH English and Spanish.
+    .map((a) => `${a.symbol}(${a.asset_type}):${a.price ?? '?'}`)
+    .join(', ');
+  const prompt = `Financial advisor. For EACH asset return JSON: {symbol,action_en("buy"/"sell"/"hold"),action_es("comprar"/"vender"/"mantener"),entry_price,exit_price,take_profit,stop_loss,reasoning_en(1 sentence),reasoning_es(1 sentence)}. All prices=numbers.
 
-For each asset provide these keys:
-- symbol (exact symbol from the list)
-- action_en: "buy", "sell", or "hold"
-- action_es: "comprar", "vender", or "mantener"
-- entry_price, exit_price, take_profit, stop_loss (numbers)
-- reasoning_en: 1-sentence reasoning in English
-- reasoning_es: 1-sentence reasoning in Spanish
+Context: ${dashboardSummary}
+Assets: ${assetsText}
 
-Market context:
-${dashboardSummary}
+Return JSON: {"recommendations":[...]}`;
 
-Assets and current prices:
-${assetsText}
-
-Respond with a JSON array only, one object per asset. If price is unknown, still suggest levels.`;
-
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
+  const res = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
+    timeout: 20000,
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -217,6 +207,7 @@ Respond with a JSON array only, one object per asset. If price is unknown, still
       model: 'gpt-4o-mini',
       messages: [{ role: 'user', content: prompt }],
       response_format: { type: 'json_object' },
+      max_tokens: 1500,
     }),
   });
   if (!res.ok) {
@@ -978,33 +969,23 @@ async function getApp(): Promise<express.Express> {
         return res.status(400).json({ error: 'Configure your AI provider and API key in Settings first.' });
       }
       console.log('[recommendations] provider:', llmRow.provider, 'apiKey length:', llmRow.api_key?.length);
-      // Read locale: prefer value sent by client, fallback to DB preference, then 'en'
-      const bodyLocale = req.body?.locale;
-      let userLocale = 'en';
-      if (typeof bodyLocale === 'string' && ['en', 'es'].includes(bodyLocale)) {
-        userLocale = bodyLocale;
-      } else {
-        const { data: prefRow } = await supabase
-          .from('user_preferences')
-          .select('locale')
-          .eq('user_id', userId)
-          .maybeSingle();
-        userLocale = (prefRow?.locale as string) || 'en';
-      }
-      console.log('[recommendations] userLocale:', userLocale, '(source:', typeof bodyLocale === 'string' ? 'request body' : 'DB/default', ')');
-      const dashboard = await dashboardService.getToday('UTC');
+      // Fetch dashboard context and all prices in parallel to save time
+      const [dashboard, ...priceResults] = await Promise.all([
+        dashboardService.getToday('UTC'),
+        ...list.map(async (a) => {
+          let price: number | null = null;
+          try { price = await fetchPrice(a.symbol, a.asset_type); } catch { /* ignore */ }
+          return { symbol: a.symbol, asset_type: a.asset_type, price };
+        }),
+      ]);
+      const assetsWithPrices = priceResults as { symbol: string; asset_type: string; price: number | null }[];
       const indSummary = dashboard.indicators.map((i: { key: string; status: string; trend: string; value?: number | null }) => `${i.key}: ${i.status} (${i.trend}), value: ${i.value ?? 'n/a'}`).join('\n');
       const dashboardSummary = `Score: ${dashboard.score}, Delta week: ${dashboard.deltaWeek}. Scenario: bull=${dashboard.scenario.bull}, bear=${dashboard.scenario.bear}.\nIndicators:\n${indSummary}`;
-      const assetsWithPrices: { symbol: string; asset_type: string; price: number | null }[] = [];
-      for (const a of list) {
-        const price = await fetchPrice(a.symbol, a.asset_type);
-        assetsWithPrices.push({ symbol: a.symbol, asset_type: a.asset_type, price });
-      }
       console.log('[recommendations] assetsWithPrices:', JSON.stringify(assetsWithPrices));
       const provider = (llmRow.provider as string) || 'openai';
       let recommendations: Array<{ symbol: string; action_en: string; action_es: string; entry_price?: number; exit_price?: number; take_profit?: number; stop_loss?: number; reasoning_en?: string; reasoning_es?: string }>;
       if (provider === 'openai') {
-        recommendations = await getRecommendationsFromOpenAI(llmRow.api_key, dashboardSummary, assetsWithPrices, userLocale);
+        recommendations = await getRecommendationsFromOpenAI(llmRow.api_key, dashboardSummary, assetsWithPrices);
       } else {
         return res.status(400).json({ error: `Provider "${provider}" is not yet supported for recommendations. Use OpenAI in Settings.` });
       }
@@ -1012,7 +993,11 @@ async function getApp(): Promise<express.Express> {
       return res.json({ recommendations });
     } catch (e) {
       console.error('/api/recommendations error:', e);
-      return res.status(500).json({ error: errorMessage(e) });
+      const msg = errorMessage(e);
+      if (msg.includes('abort') || msg.includes('timeout') || msg.includes('Timedout')) {
+        return res.status(504).json({ error: 'Recommendation request timed out. Try again or reduce the number of assets.' });
+      }
+      return res.status(500).json({ error: msg });
     }
   });
 
