@@ -134,6 +134,8 @@ export default function DashboardPage() {
         setData(d);
         setScoreHistory(sh.data || []);
         setError(null);
+        setCronSecretPrompt(false);
+        setCronSecretInput('');
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         setRunJobsError(msg);
