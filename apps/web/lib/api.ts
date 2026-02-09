@@ -78,14 +78,32 @@ export async function deleteRule(id: string): Promise<{ deleted: boolean }> {
   return res.json();
 }
 
-/** Trigger the run-jobs Netlify function. Pass cronSecret if CRON_SECRET is set in Netlify. */
+/** Trigger the run-jobs Netlify function. Pass cronSecret if CRON_SECRET is set in Netlify.
+ *  Fire-and-forget: we don't wait for the full response since the job can take 18s+
+ *  which exceeds Netlify's sandbox timeout. We just confirm the request was accepted. */
 export async function triggerRunJobs(cronSecret?: string): Promise<{ ok: boolean }> {
   const base = typeof window !== 'undefined' ? '' : API_BASE || 'http://localhost:3000';
   const url = `${base}/.netlify/functions/run-jobs`;
   const headers: Record<string, string> = {};
   if (cronSecret) headers['X-Cron-Secret'] = cronSecret;
-  const res = await fetch(url, { method: 'POST', headers });
+  // Use a short timeout — we only need to confirm the request was received, not wait for completion.
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 28000);
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'POST', headers, signal: controller.signal });
+  } catch (e) {
+    clearTimeout(timer);
+    // If aborted, the job is likely still running server-side — treat as success
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      return { ok: true };
+    }
+    throw e;
+  }
+  clearTimeout(timer);
   if (res.status === 401) throw new Error('Cron secret required. Set CRON_SECRET in Netlify and enter it when prompted.');
+  // 502/504 from Netlify gateway timeout — job is still running, treat as success
+  if (res.status === 502 || res.status === 504) return { ok: true };
   await throwOnNotOk(res);
   return res.json().catch(() => ({ ok: true }));
 }
@@ -257,14 +275,28 @@ export async function triggerPopulateSymbols(cronSecret?: string): Promise<{ ok:
   return res.json();
 }
 
-/** One-time backfill: load 90 days of history for all indicators. Uses same secret as run-jobs (CRON_SECRET). */
+/** One-time backfill: load 90 days of history for all indicators. Uses same secret as run-jobs (CRON_SECRET).
+ *  Same fire-and-forget pattern: backfill can take 20s+. */
 export async function triggerBackfillHistory(cronSecret?: string): Promise<{ ok: boolean; message?: string; results?: Record<string, { raw: number; points: number }> }> {
   const base = typeof window !== 'undefined' ? '' : API_BASE || 'http://localhost:3000';
   const url = `${base}/.netlify/functions/backfill-history`;
   const headers: Record<string, string> = {};
   if (cronSecret) headers['X-Cron-Secret'] = cronSecret;
-  const res = await fetch(url, { method: 'POST', headers });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 28000);
+  let res: Response;
+  try {
+    res = await fetch(url, { method: 'POST', headers, signal: controller.signal });
+  } catch (e) {
+    clearTimeout(timer);
+    if (e instanceof DOMException && e.name === 'AbortError') {
+      return { ok: true, message: 'Backfill triggered (running in background).' };
+    }
+    throw e;
+  }
+  clearTimeout(timer);
   if (res.status === 401) throw new Error('Cron secret required. Set CRON_SECRET in Netlify and enter it when prompted.');
+  if (res.status === 502 || res.status === 504) return { ok: true, message: 'Backfill triggered (running in background).' };
   await throwOnNotOk(res);
   return res.json();
 }

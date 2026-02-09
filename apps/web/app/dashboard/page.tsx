@@ -106,7 +106,14 @@ export default function DashboardPage() {
         await triggerRunJobs(secret);
         setCronSecretPrompt(false);
         setCronSecretInput('');
-        const [d, sh] = await refreshData();
+        // The job may still be running server-side; wait a bit then poll for updated data
+        await new Promise((r) => setTimeout(r, 5000));
+        // Try to refresh dashboard data — retry once after another delay if score hasn't changed
+        let [d, sh] = await refreshData();
+        if (data && d.score === data.score) {
+          await new Promise((r) => setTimeout(r, 8000));
+          [d, sh] = await refreshData();
+        }
         setData(d);
         setScoreHistory(sh.data || []);
         setError(null);
@@ -118,7 +125,7 @@ export default function DashboardPage() {
         setRunJobsLoading(false);
       }
     },
-    [],
+    [data],
   );
 
   const runBackfillNow = useCallback(
