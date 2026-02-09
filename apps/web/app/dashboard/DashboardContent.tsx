@@ -25,6 +25,7 @@ export type DashboardContentProps = {
   locale: string;
   runJobsNow: (secret?: string) => void;
   runJobsLoading: boolean;
+  runJobsProgress: { current: number; total: number; currentKey: string } | null;
   runBackfillNow: (secret?: string) => void;
   backfillLoading: boolean;
   cronSecretPrompt: boolean;
@@ -131,7 +132,7 @@ function typeKey(assetType: string) {
 export function DashboardContent(props: DashboardContentProps) {
   const {
     data, scoreHistory, t, translateExplain, locale,
-    runJobsNow, runJobsLoading, runBackfillNow, backfillLoading,
+    runJobsNow, runJobsLoading, runJobsProgress, runBackfillNow, backfillLoading,
     cronSecretPrompt, cronSecretInput, setCronSecretInput, setCronSecretPrompt,
     setRunJobsError, setBackfillError, runJobsError, backfillError, backfillSuccess,
     statusIconColor, trendArrow,
@@ -203,6 +204,23 @@ export function DashboardContent(props: DashboardContentProps) {
             <span className={`cb-action-label ${backfillLoading ? 'text-slate-400 dark:text-slate-500' : ''}`}>{backfillLoading ? t('common.loading') : t('dashboard.backfillHistory')}</span>
           </button>
         </div>
+
+        {/* Run-jobs progress bar */}
+        {runJobsLoading && runJobsProgress && (
+          <div className="mt-4">
+            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+              <span className="truncate mr-2">
+                {runJobsProgress.currentKey === 'score'
+                  ? t('dashboard.runJobsFinalizing')
+                  : `${t('dashboard.runJobsProcessing')} ${runJobsProgress.currentKey}`}
+              </span>
+              <span className="shrink-0">{runJobsProgress.current}/{runJobsProgress.total}</span>
+            </div>
+            <div className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
+              <div className="h-full bg-indigo-500 rounded-full transition-all duration-500 ease-out" style={{ width: `${Math.round((runJobsProgress.current / runJobsProgress.total) * 100)}%` }} />
+            </div>
+          </div>
+        )}
 
         {/* Status messages */}
         {runJobsError && <p className="text-sm text-red-600 dark:text-red-400 mt-3">{runJobsError}</p>}

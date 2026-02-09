@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/app/context/LocaleContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
-import { fetchDashboard, fetchScoreHistory, triggerRunJobs, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, fetchMarketScan, getLlmSettings, type AiRecommendation, type MarketScanResult } from '@/lib/api';
+import { fetchDashboard, fetchScoreHistory, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, fetchMarketScan, getLlmSettings, runJobStep, runJobFinalize, getIndicatorKeys, type AiRecommendation, type MarketScanResult } from '@/lib/api';
 import { DashboardContent } from './DashboardContent';
 import { DashboardErrorView } from './DashboardErrorView';
 
@@ -30,6 +30,7 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [runJobsLoading, setRunJobsLoading] = useState(false);
   const [runJobsError, setRunJobsError] = useState<string | null>(null);
+  const [runJobsProgress, setRunJobsProgress] = useState<{ current: number; total: number; currentKey: string } | null>(null);
   const [backfillLoading, setBackfillLoading] = useState(false);
   const [backfillError, setBackfillError] = useState<string | null>(null);
   const [backfillSuccess, setBackfillSuccess] = useState<string | null>(null);
@@ -99,33 +100,49 @@ export default function DashboardPage() {
   }, []);
 
   const runJobsNow = useCallback(
-    async (secret?: string) => {
+    async (_secret?: string) => {
       setRunJobsError(null);
       setRunJobsLoading(true);
+      setRunJobsProgress(null);
       try {
-        await triggerRunJobs(secret);
-        setCronSecretPrompt(false);
-        setCronSecretInput('');
-        // The job may still be running server-side; wait a bit then poll for updated data
-        await new Promise((r) => setTimeout(r, 5000));
-        // Try to refresh dashboard data — retry once after another delay if score hasn't changed
-        let [d, sh] = await refreshData();
-        if (data && d.score === data.score) {
-          await new Promise((r) => setTimeout(r, 8000));
-          [d, sh] = await refreshData();
+        // Get the list of enabled indicators from the server
+        const keys = await getIndicatorKeys();
+        if (keys.length === 0) {
+          setRunJobsError('No indicators configured.');
+          setRunJobsLoading(false);
+          return;
         }
+        const total = keys.length + 1; // +1 for finalize step
+
+        // Process each indicator one by one, updating progress
+        for (let i = 0; i < keys.length; i++) {
+          setRunJobsProgress({ current: i + 1, total, currentKey: keys[i] });
+          try {
+            await runJobStep(keys[i]);
+          } catch (e) {
+            console.warn(`[runJobsNow] step failed for ${keys[i]}:`, e);
+            // Continue with next indicator even if one fails
+          }
+        }
+
+        // Finalize: compute score + run alert rules
+        setRunJobsProgress({ current: total, total, currentKey: 'score' });
+        await runJobFinalize();
+
+        // Refresh dashboard data
+        const [d, sh] = await refreshData();
         setData(d);
         setScoreHistory(sh.data || []);
         setError(null);
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        if (msg.includes('Cron secret required')) setCronSecretPrompt(true);
-        else setRunJobsError(msg);
+        setRunJobsError(msg);
       } finally {
         setRunJobsLoading(false);
+        setRunJobsProgress(null);
       }
     },
-    [data],
+    [],
   );
 
   const runBackfillNow = useCallback(
@@ -291,6 +308,7 @@ export default function DashboardPage() {
     locale={locale}
     runJobsNow={runJobsNow}
     runJobsLoading={runJobsLoading}
+    runJobsProgress={runJobsProgress}
     runBackfillNow={runBackfillNow}
     backfillLoading={backfillLoading}
     cronSecretPrompt={cronSecretPrompt}

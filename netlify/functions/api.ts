@@ -7,6 +7,19 @@ import {
   DashboardService,
   IndicatorsService,
   AlertsService,
+  StatusEngine,
+  RulesEngine,
+  NotificationService,
+  FredAdapter,
+  CoinGeckoAdapter,
+  BinanceAdapter,
+  AlternativeMeAdapter,
+  TwelveDataAdapter,
+  type ProviderAdapter,
+  linearRegressionSlope,
+  average,
+  MoreThanOrEqual,
+  IsNull,
 } from '@market-health/api-core';
 
 const LLM_PROVIDERS = ['openai', 'claude', 'gemini'] as const;
@@ -661,7 +674,9 @@ async function getApp(): Promise<express.Express> {
   app.get('/api/config', (_req: Request, res: Response) => {
     const url = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL ?? null;
     const anonKey = process.env.SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? null;
-    res.json({ supabaseUrl: url ?? null, supabaseAnonKey: anonKey ?? null });
+    const registry = new RegistryService();
+    const indicatorKeys = registry.getEnabled().map((i) => i.key);
+    res.json({ supabaseUrl: url ?? null, supabaseAnonKey: anonKey ?? null, indicatorKeys });
   });
 
   app.get('/api/dashboard/today', async (req: Request, res: Response) => {
@@ -1122,6 +1137,271 @@ async function getApp(): Promise<express.Express> {
         return res.status(504).json({ error: 'Scan timed out. Try fewer results or fewer asset types.' });
       }
       return res.status(500).json({ error: msg });
+    }
+  });
+
+  // ── Run-job step: process a single indicator (fetch + aggregate + derive + status) ──
+  app.post('/api/run-job-step', async (req: Request, res: Response) => {
+    try {
+      const indicatorKey = req.body?.indicatorKey as string | undefined;
+      if (!indicatorKey) return res.status(400).json({ error: 'indicatorKey required' });
+
+      const db = await getDb();
+      const rawRepo = db.getRawRepo();
+      const pointsRepo = db.getPointsRepo();
+      const derivedRepo = db.getDerivedRepo();
+      const snapshotRepo = db.getSnapshotRepo();
+
+      const registry = new RegistryService();
+      const adapters: ProviderAdapter[] = [
+        new FredAdapter(),
+        new CoinGeckoAdapter(),
+        new BinanceAdapter(),
+        new AlternativeMeAdapter(),
+        new TwelveDataAdapter(),
+      ];
+      const getAdapter = (k: string) => adapters.find((a) => a.supports.includes(k)) ?? null;
+
+      const indConfig = registry.getByKey(indicatorKey);
+      if (!indConfig) return res.status(400).json({ error: `Unknown indicator: ${indicatorKey}` });
+
+      // 1. Fetch raw data
+      const adapter = getAdapter(indicatorKey);
+      let fetchedCount = 0;
+      if (adapter) {
+        try {
+          const points = await adapter.fetch(indicatorKey, {});
+          if (points.length > 0) {
+            const rows = points.map((p) => ({
+              id: crypto.randomUUID(),
+              ts: new Date(p.ts),
+              indicator_key: p.indicatorKey,
+              value: p.value,
+              source: p.meta.source,
+              raw_json: p.meta.raw ? JSON.parse(JSON.stringify(p.meta.raw)) : null,
+            }));
+            await rawRepo.insertOrIgnore(rows);
+            fetchedCount = rows.length;
+          }
+        } catch (err) {
+          console.warn(`[run-job-step] Fetch failed for ${indicatorKey}:`, err);
+        }
+      }
+
+      // 2. Aggregate
+      const aggregateKeys: string[] = [];
+      if (indicatorKey === 'eq.leaders' && indConfig.constituents) {
+        aggregateKeys.push(...indConfig.constituents.map((c) => `eq.leaders.${c}`));
+      } else {
+        aggregateKeys.push(indicatorKey);
+      }
+
+      for (const aggKey of aggregateKeys) {
+        const since = new Date(Date.now() - 32 * 24 * 60 * 60 * 1000);
+        const raws = await rawRepo.find({
+          where: { indicator_key: aggKey, ts: MoreThanOrEqual(since) },
+          order: { ts: 'ASC' },
+          take: 5000,
+        });
+        if (raws.length === 0) continue;
+        const byDay = new Map<string, { ts: Date; value: number }>();
+        for (const r of raws) {
+          const day = r.ts.toISOString().slice(0, 10);
+          const existing = byDay.get(day);
+          if (!existing || r.ts > existing.ts) byDay.set(day, { ts: r.ts, value: Number(r.value) });
+        }
+        const pointRows = Array.from(byDay.values()).map((v) => ({
+          id: crypto.randomUUID(),
+          ts: v.ts,
+          indicator_key: aggKey,
+          value: v.value,
+          granularity: '1d',
+          quality_flag: 'ok',
+        }));
+        await pointsRepo.insertOrIgnore(pointRows);
+      }
+
+      // 3. Derive
+      for (const aggKey of aggregateKeys) {
+        const cfg = registry.getByKey(aggKey) || (aggKey.startsWith('eq.leaders.') ? registry.getByKey('eq.leaders') : undefined);
+        const trendWindow = cfg?.trend_window_days ?? 21;
+        const since = new Date(Date.now() - 35 * 24 * 60 * 60 * 1000);
+        const points = await pointsRepo.find({
+          where: { indicator_key: aggKey, ts: MoreThanOrEqual(since), granularity: '1d' },
+          order: { ts: 'ASC' },
+          take: 100,
+        });
+        if (points.length < 2) continue;
+        const values = points.map((p) => ({ ts: p.ts, value: Number(p.value) }));
+        for (let i = trendWindow; i < values.length; i++) {
+          const window = values.slice(i - trendWindow, i);
+          const vals = window.map((v) => v.value);
+          const slope21 = linearRegressionSlope(vals);
+          const slope14 = window.length >= 14 ? linearRegressionSlope(vals.slice(-14)) : slope21;
+          const ma21 = average(vals);
+          const v0 = values[i].value;
+          const v1d = i >= 1 ? values[i - 1].value : v0;
+          const v7d = i >= 7 ? values[i - 7].value : v0;
+          const v14d = i >= 14 ? values[i - 14].value : v0;
+          const v21d = i >= 21 ? values[i - 21].value : v0;
+          await derivedRepo.insertOrIgnore([{
+            id: crypto.randomUUID(),
+            ts: values[i].ts,
+            indicator_key: aggKey,
+            pct_1d: v1d !== 0 ? ((v0 - v1d) / v1d) * 100 : 0,
+            pct_7d: v7d !== 0 ? ((v0 - v7d) / v7d) * 100 : 0,
+            pct_14d: v14d !== 0 ? ((v0 - v14d) / v14d) * 100 : 0,
+            pct_21d: v21d !== 0 ? ((v0 - v21d) / v21d) * 100 : 0,
+            slope_14d: slope14,
+            slope_21d: slope21,
+            ma_21d: ma21,
+          }]);
+        }
+      }
+
+      // 4. Status snapshot
+      const statusEngine = new StatusEngine(registry);
+      const ts = new Date();
+      let status = 'UNKNOWN';
+      let trend = 'FLAT';
+      let explanation = '';
+
+      if (indicatorKey === 'eq.leaders') {
+        const tickers = indConfig.constituents || ['NVDA', 'MSFT', 'AAPL', 'GOOGL'];
+        let green = 0, red = 0;
+        const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        for (const sym of tickers) {
+          const k = `eq.leaders.${sym}`;
+          const pts = await pointsRepo.find({
+            where: { indicator_key: k, ts: MoreThanOrEqual(since), granularity: '1d' },
+            order: { ts: 'ASC' },
+            take: 25,
+          });
+          if (pts.length < 5) continue;
+          const derivedRow = await derivedRepo.findOne({ where: { indicator_key: k }, order: { ts: 'DESC' } });
+          const result = statusEngine.compute(
+            'eq.nasdaq',
+            pts.map((p) => ({ ts: p.ts, value: Number(p.value) })),
+            { slope: derivedRow?.slope_21d != null ? Number(derivedRow.slope_21d) : undefined, ma_21d: derivedRow?.ma_21d != null ? Number(derivedRow.ma_21d) : undefined },
+            24 * 3600 * 1000,
+            pts[pts.length - 1].ts,
+          );
+          if (result.status === 'GREEN') green++;
+          if (result.status === 'RED') red++;
+        }
+        status = green >= 3 ? 'GREEN' : green === 2 ? 'YELLOW' : red >= 2 ? 'RED' : 'YELLOW';
+        trend = green >= 3 ? 'RISING' : red >= 2 ? 'FALLING' : 'FLAT';
+        explanation = `${green} leaders green, ${red} red`;
+      } else {
+        const stalenessMs = indConfig.poll_interval_sec * 3 * 1000;
+        const since = new Date(Date.now() - (indConfig.trend_window_days + 5) * 24 * 60 * 60 * 1000);
+        const points = await pointsRepo.find({
+          where: { indicator_key: indicatorKey, ts: MoreThanOrEqual(since), granularity: '1d' },
+          order: { ts: 'ASC' },
+          take: 50,
+        });
+        const latestTs = points.length ? points[points.length - 1].ts : new Date(0);
+        const derivedRow = await derivedRepo.findOne({
+          where: { indicator_key: indicatorKey, ts: MoreThanOrEqual(since) },
+          order: { ts: 'DESC' },
+        });
+        const result = statusEngine.compute(
+          indicatorKey,
+          points.map((p) => ({ ts: p.ts, value: Number(p.value) })),
+          { slope: derivedRow?.slope_21d != null ? Number(derivedRow.slope_21d) : undefined, ma_21d: derivedRow?.ma_21d != null ? Number(derivedRow.ma_21d) : undefined },
+          stalenessMs,
+          latestTs,
+        );
+        status = result.status;
+        trend = result.trend;
+        explanation = result.explanation;
+      }
+
+      await snapshotRepo.save({ ts, indicator_key: indicatorKey, status, trend, explanation, meta: null });
+
+      return res.json({ ok: true, indicatorKey, fetched: fetchedCount, status, trend });
+    } catch (e) {
+      console.error('[run-job-step] error:', e);
+      return res.status(500).json({ error: errorMessage(e) });
+    }
+  });
+
+  // ── Run-job finalize: compute weekly score + evaluate alert rules ──
+  app.post('/api/run-job-finalize', async (req: Request, res: Response) => {
+    try {
+      const db = await getDb();
+      const snapshotRepo = db.getSnapshotRepo();
+      const scoreRepo = db.getScoreRepo();
+      const ruleRepo = db.getRuleRepo();
+      const firedRepo = db.getFiredRepo();
+      const pointsRepo = db.getPointsRepo();
+      const deliveryRepo = db.getDeliveryRepo();
+
+      const registry = new RegistryService();
+      const coreKeys = registry.getCoreKeys().filter((k) => registry.getByKey(k)?.enabled);
+      const ts = new Date();
+
+      // Count GREEN indicators from the latest snapshots
+      let scoreCount = 0;
+      for (const key of coreKeys) {
+        const snap = await snapshotRepo.findOne({ where: { indicator_key: key }, order: { ts: 'DESC' } });
+        if (snap && snap.status === 'GREEN') scoreCount++;
+      }
+
+      // Save weekly score
+      const weekStart = (() => {
+        const d = ts;
+        const day = d.getUTCDay();
+        const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+        const monday = new Date(d);
+        monday.setUTCDate(diff);
+        return monday.toISOString().slice(0, 10);
+      })();
+      const prevWeekStart = (() => {
+        const d = new Date(weekStart);
+        d.setUTCDate(d.getUTCDate() - 7);
+        return d.toISOString().slice(0, 10);
+      })();
+      const prevScore = await scoreRepo.findOne({ where: { week_start_date: prevWeekStart, user_id: IsNull() } });
+      const delta = prevScore ? scoreCount - prevScore.score : 0;
+      try {
+        const existing = await scoreRepo.findOne({ where: { week_start_date: weekStart, user_id: IsNull() } });
+        if (existing) {
+          (existing as Record<string, unknown>).score = scoreCount;
+          (existing as Record<string, unknown>).delta_score = delta;
+          await scoreRepo.save(existing);
+        } else {
+          await scoreRepo.save({ week_start_date: weekStart, user_id: null, score: scoreCount, delta_score: delta, notes: null });
+        }
+      } catch (e) {
+        console.error('[run-job-finalize] score save failed:', weekStart, scoreCount, e);
+      }
+
+      // Evaluate alert rules
+      const rulesEngine = new RulesEngine(ruleRepo, firedRepo, pointsRepo, snapshotRepo);
+      const notificationService = new NotificationService(firedRepo, deliveryRepo);
+      const rules = await ruleRepo.find({ where: { is_enabled: true } });
+      for (const rule of rules) {
+        const ruleId = rule?.id;
+        if (!ruleId || String(ruleId) === 'undefined') continue;
+        try {
+          const { fired, payload } = await rulesEngine.evaluateRule(rule);
+          if (!fired || !payload) continue;
+          const json = rule.json_rule as { name?: string; cooldownMinutes?: number; condition?: unknown; actions?: string[] };
+          const dedupeKey = rulesEngine.dedupeKey(ruleId, payload);
+          const existingFired = await firedRepo.findOne({ where: { dedupe_key: dedupeKey } });
+          if (existingFired) continue;
+          const alert = await firedRepo.save({ rule_id: ruleId, ts: new Date(), payload, dedupe_key: dedupeKey });
+          await notificationService.send(alert.id, payload, json.actions ?? ['email']);
+        } catch (err) {
+          console.warn('[run-job-finalize] rule eval failed', ruleId, err);
+        }
+      }
+
+      return res.json({ ok: true, score: scoreCount, delta });
+    } catch (e) {
+      console.error('[run-job-finalize] error:', e);
+      return res.status(500).json({ error: errorMessage(e) });
     }
   });
 

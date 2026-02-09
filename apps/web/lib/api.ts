@@ -108,6 +108,36 @@ export async function triggerRunJobs(cronSecret?: string): Promise<{ ok: boolean
   return res.json().catch(() => ({ ok: true }));
 }
 
+/** Process a single indicator (fetch + aggregate + derive + status). Returns the result for that indicator. */
+export async function runJobStep(indicatorKey: string): Promise<{ ok: boolean; indicatorKey: string; fetched: number; status: string; trend: string }> {
+  const res = await fetch(`${API_BASE}/api/run-job-step`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ indicatorKey }),
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+/** Finalize run-jobs: compute weekly score + evaluate alert rules. Call after all indicators are processed. */
+export async function runJobFinalize(): Promise<{ ok: boolean; score: number; delta: number }> {
+  const res = await fetch(`${API_BASE}/api/run-job-finalize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+/** Get the list of enabled indicator keys from the server config. */
+export async function getIndicatorKeys(): Promise<string[]> {
+  const res = await fetch(`${API_BASE}/api/config`);
+  await throwOnNotOk(res);
+  const data = await res.json();
+  // The config endpoint returns indicator keys
+  return data.indicatorKeys || [];
+}
+
 export async function getLlmSettings(accessToken: string): Promise<{ provider: string | null; hasKey: boolean }> {
   const res = await fetch(`${API_BASE}/api/user/llm-settings`, {
     headers: { Authorization: `Bearer ${accessToken}` },

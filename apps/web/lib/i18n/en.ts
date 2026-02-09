@@ -32,6 +32,8 @@ export const en = {
     asOf: 'As of',
     runJobs: 'Refresh',
     running: 'Refreshing…',
+    runJobsProcessing: 'Processing',
+    runJobsFinalizing: 'Computing score…',
     weeklyScore: 'Weekly Score',
     weeklyScoreTooltip: 'Number of indicators in GREEN status this week (max 6). Counted every Monday.',
     weeklyScoreBreakdown: 'How this score is calculated',

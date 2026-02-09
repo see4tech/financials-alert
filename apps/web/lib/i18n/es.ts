@@ -34,6 +34,8 @@ export const es: typeof en = {
     asOf: 'Actualizado',
     runJobs: 'Actualizar',
     running: 'Actualizando…',
+    runJobsProcessing: 'Procesando',
+    runJobsFinalizing: 'Calculando puntuación…',
     weeklyScore: 'Puntuación semanal',
     weeklyScoreTooltip: 'Número de indicadores en estado VERDE esta semana (máx. 6). Se cuenta cada lunes.',
     weeklyScoreBreakdown: 'Cómo se llega a esta puntuación',
