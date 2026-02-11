@@ -19,6 +19,7 @@ export const es: typeof en = {
     password: 'Contraseña',
     loginError: 'Correo o contraseña incorrectos.',
     signupError: 'Error al registrarse. Prueba otro correo o revisa la contraseña.',
+    signupTimeout: 'El registro está tardando demasiado. Inténtalo de nuevo en un momento.',
     signupSuccess: 'Cuenta creada. Ya has iniciado sesión.',
     notConfigured: 'Auth no está configurado. Configura SUPABASE_URL y SUPABASE_ANON_KEY en Netlify (o en tu entorno). Puedes usar la app desde el Panel.',
   },

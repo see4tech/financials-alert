@@ -17,6 +17,7 @@ export const en = {
     password: 'Password',
     loginError: 'Invalid email or password.',
     signupError: 'Sign up failed. Try another email or check your password.',
+    signupTimeout: 'Registration is taking too long. Please try again in a moment.',
     signupSuccess: 'Account created. You are now logged in.',
     notConfigured: 'Auth is not configured. Set SUPABASE_URL and SUPABASE_ANON_KEY in Netlify (or in your environment). You can still use the app via Dashboard.',
   },

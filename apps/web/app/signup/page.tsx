@@ -30,6 +30,13 @@ export default function SignupPage() {
     }
   }, [clientReady, router]);
 
+  function isTimeoutOr504(err: unknown): boolean {
+    if (!err || typeof err !== 'object') return false;
+    const msg = String((err as { message?: string }).message ?? '').toLowerCase();
+    const status = (err as { status?: number }).status;
+    return status === 504 || msg.includes('504') || msg.includes('timeout') || msg.includes('gateway');
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     const client = getSupabaseBrowser();
@@ -39,14 +46,14 @@ export default function SignupPage() {
     try {
       const { error: err } = await client.auth.signUp({ email, password });
       if (err) {
-        setError(t('auth.signupError'));
+        setError(isTimeoutOr504(err) ? t('auth.signupTimeout') : t('auth.signupError'));
         setLoading(false);
         return;
       }
       router.push('/dashboard');
       router.refresh();
-    } catch {
-      setError(t('auth.signupError'));
+    } catch (e) {
+      setError(isTimeoutOr504(e) ? t('auth.signupTimeout') : t('auth.signupError'));
       setLoading(false);
     }
   }
