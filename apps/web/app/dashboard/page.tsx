@@ -291,12 +291,12 @@ export default function DashboardPage() {
     scanCancelledRef.current = true;
   }, []);
 
-  const handlePlaceEtoroOrder = useCallback(async (symbol: string, amount: number, isBuy: boolean) => {
+  const handlePlaceEtoroOrder = useCallback(async (symbol: string, amount: number, isBuy: boolean): Promise<void> => {
     const client = getSupabaseBrowser();
     if (!client) throw new Error('Not authenticated');
     const { data: { session } } = await client.auth.getSession();
     if (!session?.access_token) throw new Error('Not authenticated');
-    return placeEtoroOrder(session.access_token, { symbol, amount, isBuy });
+    await placeEtoroOrder(session.access_token, { symbol, amount, isBuy });
   }, []);
 
   if (loading) return <div className="pt-16 p-8 pb-24 md:pb-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
