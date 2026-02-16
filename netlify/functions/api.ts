@@ -107,6 +107,83 @@ async function fetchWithTimeout(url: string, init: RequestInit & { timeout?: num
   }
 }
 
+const ETORO_API_BASE = 'https://public-api.etoro.com/api/v1';
+
+function etoroHeaders(apiKey: string, userKey: string): Record<string, string> {
+  return {
+    'x-api-key': apiKey,
+    'x-user-key': userKey,
+    'x-request-id': crypto.randomUUID(),
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+  };
+}
+
+/** Check if a symbol exists on eToro (search API). Returns true if found. */
+async function etoroSymbolExists(apiKey: string, userKey: string, symbol: string): Promise<boolean> {
+  const url = `${ETORO_API_BASE}/market-data/search?internalSymbolFull=${encodeURIComponent(symbol.trim())}`;
+  const res = await fetchWithTimeout(url, {
+    timeout: 4000,
+    headers: etoroHeaders(apiKey, userKey),
+  });
+  if (!res.ok) return false;
+  const data = (await res.json()) as { items?: Array<{ internalSymbolFull?: string }> };
+  const items = data?.items ?? [];
+  const upper = symbol.trim().toUpperCase();
+  return items.some((i) => (i.internalSymbolFull ?? '').toUpperCase() === upper);
+}
+
+/** Resolve symbol to eToro instrumentId. Returns null if not found. */
+async function etoroResolveSymbol(apiKey: string, userKey: string, symbol: string): Promise<number | null> {
+  const url = `${ETORO_API_BASE}/market-data/search?internalSymbolFull=${encodeURIComponent(symbol.trim())}`;
+  const res = await fetchWithTimeout(url, {
+    timeout: 5000,
+    headers: etoroHeaders(apiKey, userKey),
+  });
+  if (!res.ok) return null;
+  const data = (await res.json()) as { items?: Array<{ instrumentId?: number; internalSymbolFull?: string }> };
+  const items = data?.items ?? [];
+  const upper = symbol.trim().toUpperCase();
+  const match = items.find((i) => (i.internalSymbolFull ?? '').toUpperCase() === upper);
+  return match?.instrumentId ?? (items[0]?.instrumentId ?? null);
+}
+
+/** Place eToro market order (open by amount). Amount in USD. demo: use demo endpoint. */
+async function etoroPlaceOrder(
+  apiKey: string,
+  userKey: string,
+  instrumentId: number,
+  amountUsd: number,
+  isBuy: boolean,
+  demo: boolean,
+): Promise<{ ok: boolean; orderId?: string; error?: string }> {
+  const path = demo
+    ? '/trading/execution/demo/market-open-orders/by-amount'
+    : '/trading/execution/market-open-orders/by-amount';
+  const url = `${ETORO_API_BASE}${path}`;
+  const res = await fetchWithTimeout(url, {
+    timeout: 15000,
+    method: 'POST',
+    headers: etoroHeaders(apiKey, userKey),
+    body: JSON.stringify({
+      InstrumentId: instrumentId,
+      Amount: Math.max(0, Number(amountUsd)),
+      Leverage: 1,
+      IsBuy: isBuy,
+    }),
+  });
+  const text = await res.text();
+  if (!res.ok) {
+    return { ok: false, error: text || res.statusText };
+  }
+  try {
+    const json = JSON.parse(text) as { orderId?: string; OrderID?: string };
+    return { ok: true, orderId: json.orderId ?? json.OrderID };
+  } catch {
+    return { ok: true };
+  }
+}
+
 // ── Hardcoded commodity symbols for market scan ──
 const COMMODITY_SYMBOLS = [
   'CL', 'GC', 'NG', 'SI', 'HG', 'PL', 'PA', 'ZC', 'ZW', 'ZS',
@@ -902,14 +979,18 @@ async function getApp(): Promise<express.Express> {
       const supabase = getSupabaseService();
       const { data: row, error } = await supabase
         .from('user_preferences')
-        .select('locale, theme')
+        .select('locale, theme, etoro_trading_mode')
         .eq('user_id', userId)
         .maybeSingle();
       if (error) {
         console.error('/api/user/preferences GET', error);
         return res.status(500).json({ error: errorMessage(error) });
       }
-      return res.json({ locale: row?.locale ?? 'en', theme: row?.theme ?? 'system' });
+      return res.json({
+        locale: row?.locale ?? 'en',
+        theme: row?.theme ?? 'system',
+        etoro_trading_mode: row?.etoro_trading_mode ?? 'demo',
+      });
     } catch (e) {
       console.error('/api/user/preferences GET', e);
       return res.status(500).json({ error: errorMessage(e) });
@@ -937,6 +1018,13 @@ async function getApp(): Promise<express.Express> {
         }
         upsertData.theme = theme;
       }
+      if ('etoro_trading_mode' in body) {
+        const etoro_trading_mode = body.etoro_trading_mode;
+        if (typeof etoro_trading_mode !== 'string' || !['demo', 'real'].includes(etoro_trading_mode)) {
+          return res.status(400).json({ error: 'etoro_trading_mode must be one of: demo, real' });
+        }
+        upsertData.etoro_trading_mode = etoro_trading_mode;
+      }
       const supabase = getSupabaseService();
       const { error } = await supabase
         .from('user_preferences')
@@ -945,9 +1033,65 @@ async function getApp(): Promise<express.Express> {
         console.error('/api/user/preferences POST', error);
         return res.status(500).json({ error: errorMessage(error) });
       }
-      return res.json({ ...(upsertData.locale ? { locale: upsertData.locale } : {}), ...(upsertData.theme ? { theme: upsertData.theme } : {}), saved: true });
+      return res.json({
+        ...(upsertData.locale ? { locale: upsertData.locale } : {}),
+        ...(upsertData.theme ? { theme: upsertData.theme } : {}),
+        ...(upsertData.etoro_trading_mode ? { etoro_trading_mode: upsertData.etoro_trading_mode } : {}),
+        saved: true,
+      });
     } catch (e) {
       console.error('/api/user/preferences POST', e);
+      return res.status(500).json({ error: errorMessage(e) });
+    }
+  });
+
+  // ── eToro settings (secrets; only configured flag returned) ──
+  app.get('/api/user/etoro-settings', async (req: Request, res: Response) => {
+    try {
+      const userId = await getUserIdFromRequest(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const supabase = getSupabaseService();
+      const { data: row, error } = await supabase
+        .from('user_etoro_settings')
+        .select('user_id')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error) {
+        console.error('/api/user/etoro-settings GET', error);
+        return res.status(500).json({ error: errorMessage(error) });
+      }
+      const configured = !!row && true;
+      return res.json({ configured });
+    } catch (e) {
+      console.error('/api/user/etoro-settings GET', e);
+      return res.status(500).json({ error: errorMessage(e) });
+    }
+  });
+
+  app.post('/api/user/etoro-settings', async (req: Request, res: Response) => {
+    try {
+      const userId = await getUserIdFromRequest(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const body = req.body ?? {};
+      const apiKey = body.apiKey ?? body.api_key;
+      const userKey = body.userKey ?? body.user_key;
+      if (typeof apiKey !== 'string' || typeof userKey !== 'string' || !apiKey.trim() || !userKey.trim()) {
+        return res.status(400).json({ error: 'apiKey and userKey are required' });
+      }
+      const supabase = getSupabaseService();
+      const { error } = await supabase
+        .from('user_etoro_settings')
+        .upsert(
+          { user_id: userId, api_key: apiKey.trim(), user_key: userKey.trim(), updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' },
+        );
+      if (error) {
+        console.error('/api/user/etoro-settings POST', error);
+        return res.status(500).json({ error: errorMessage(error) });
+      }
+      return res.json({ saved: true });
+    } catch (e) {
+      console.error('/api/user/etoro-settings POST', e);
       return res.status(500).json({ error: errorMessage(e) });
     }
   });
@@ -1071,7 +1215,9 @@ async function getApp(): Promise<express.Express> {
         Array.isArray(rawExclude) ? rawExclude.filter((s: unknown) => typeof s === 'string').map((s: string) => s.toUpperCase()) : [],
       );
 
-      console.log('[market-scan] locale:', userLocale, 'count:', count, 'assetTypes:', assetTypes, 'exclude:', excludeSet.size);
+      const etoroOnly = req.body?.etoroOnly === true;
+
+      console.log('[market-scan] locale:', userLocale, 'count:', count, 'assetTypes:', assetTypes, 'exclude:', excludeSet.size, 'etoroOnly:', etoroOnly);
 
       // Phase 1: Fetch screening data in parallel (only for requested asset types)
       // Each source is wrapped so one timeout doesn't kill the entire scan
@@ -1089,12 +1235,38 @@ async function getApp(): Promise<express.Express> {
       ]);
       console.log(`[market-scan] Phase 1 done in ${Date.now()}ms: stocks=${stocks.length}, etfs=${etfs.length}, crypto=${crypto.length}, commodities=${commodities.length}`);
 
-      const allCandidates = [...stocks, ...etfs, ...crypto, ...commodities]
+      let allCandidates = [...stocks, ...etfs, ...crypto, ...commodities]
         .filter((c) => !excludeSet.has(c.symbol.toUpperCase()));
       if (allCandidates.length === 0) {
         // If all candidates were excluded, return empty (not an error – the client already has results)
         if (excludeSet.size > 0) return res.json({ scan: [] });
         return res.status(500).json({ error: 'Could not fetch screening data from any source.' });
+      }
+
+      // Optional: filter to eToro instruments only
+      if (etoroOnly) {
+        const { data: etoroRow, error: etoroErr } = await supabase
+          .from('user_etoro_settings')
+          .select('api_key, user_key')
+          .eq('user_id', userId)
+          .maybeSingle();
+        if (etoroErr || !etoroRow?.api_key || !etoroRow?.user_key) {
+          return res.status(400).json({ error: 'Configure eToro in Settings and enable eToro-only scan.' });
+        }
+        const CHUNK = 10;
+        const filtered: ScanCandidate[] = [];
+        for (let i = 0; i < allCandidates.length; i += CHUNK) {
+          const chunk = allCandidates.slice(i, i + CHUNK);
+          const results = await Promise.all(
+            chunk.map(async (c) => (await etoroSymbolExists(etoroRow.api_key, etoroRow.user_key, c.symbol)) ? c : null),
+          );
+          results.forEach((c) => { if (c) filtered.push(c); });
+        }
+        allCandidates = filtered;
+        console.log('[market-scan] after eToro filter:', allCandidates.length, 'candidates');
+        if (allCandidates.length === 0) {
+          return res.status(500).json({ error: 'No scan candidates are available on eToro. Try other asset types or run without "Only eToro assets".' });
+        }
       }
 
       // Phase 2: Algorithmic scoring – pick exactly `count` candidates (no extra for AI)
@@ -1137,6 +1309,54 @@ async function getApp(): Promise<express.Express> {
         return res.status(504).json({ error: 'Scan timed out. Try fewer results or fewer asset types.' });
       }
       return res.status(500).json({ error: msg });
+    }
+  });
+
+  // ── eToro: place order (open position from scanner) ──
+  app.post('/api/etoro/order', async (req: Request, res: Response) => {
+    try {
+      const userId = await getUserIdFromRequest(req);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const supabase = getSupabaseService();
+      const { data: etoroRow, error: etoroErr } = await supabase
+        .from('user_etoro_settings')
+        .select('api_key, user_key')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (etoroErr || !etoroRow?.api_key || !etoroRow?.user_key) {
+        return res.status(400).json({ error: 'Configure eToro API key and User key in Settings first.' });
+      }
+      const { data: prefRow } = await supabase
+        .from('user_preferences')
+        .select('etoro_trading_mode')
+        .eq('user_id', userId)
+        .maybeSingle();
+      const tradingMode = (prefRow?.etoro_trading_mode as string) ?? 'demo';
+      const demo = tradingMode === 'demo';
+
+      const body = req.body ?? {};
+      const symbol = typeof body.symbol === 'string' ? body.symbol.trim() : '';
+      const amount = typeof body.amount === 'number' ? body.amount : parseFloat(String(body.amount ?? 0));
+      const isBuy = body.isBuy !== false && body.isBuy !== 'false';
+
+      if (!symbol) return res.status(400).json({ error: 'symbol is required' });
+      if (!Number.isFinite(amount) || amount <= 0 || amount > 1000000) {
+        return res.status(400).json({ error: 'amount must be a positive number (USD, max 1000000)' });
+      }
+
+      const instrumentId = await etoroResolveSymbol(etoroRow.api_key, etoroRow.user_key, symbol);
+      if (instrumentId == null) {
+        return res.status(404).json({ error: `Symbol "${symbol}" not found on eToro.` });
+      }
+
+      const result = await etoroPlaceOrder(etoroRow.api_key, etoroRow.user_key, instrumentId, amount, isBuy, demo);
+      if (!result.ok) {
+        return res.status(502).json({ error: result.error ?? 'eToro order failed' });
+      }
+      return res.json({ ok: true, orderId: result.orderId });
+    } catch (e) {
+      console.error('/api/etoro/order error:', e);
+      return res.status(500).json({ error: errorMessage(e) });
     }
   });
 

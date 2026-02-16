@@ -58,12 +58,14 @@ export type DashboardContentProps = {
   populateError: string | null;
   setHoveredCard: (v: string | null) => void;
   hoveredCard: string | null;
-  handleMarketScan: (count: number, assetTypes: string[]) => void;
+  handleMarketScan: (count: number, assetTypes: string[], etoroOnly?: boolean) => void;
   handleStopScan: () => void;
   scanLoading: boolean;
   scanResults: MarketScanResult[] | null;
   scanError: string | null;
   scanTotal: number;
+  hasEtoroConfigured: boolean;
+  handlePlaceEtoroOrder: (symbol: string, amount: number, isBuy: boolean) => Promise<void>;
 };
 
 type TabId = 'indicators' | 'assets' | 'scanner';
@@ -141,6 +143,7 @@ export function DashboardContent(props: DashboardContentProps) {
     handleGenerateRecommendations, recsLoading, recsError, aiRecommendations,
     hasLlmKey, setHoveredCard, hoveredCard,
     handleMarketScan, handleStopScan, scanLoading, scanResults, scanError, scanTotal,
+    hasEtoroConfigured, handlePlaceEtoroOrder,
   } = props;
 
   const [activeTab, setActiveTab] = useState<TabId>('indicators');
@@ -495,6 +498,8 @@ export function DashboardContent(props: DashboardContentProps) {
           handleMarketScan={handleMarketScan} handleStopScan={handleStopScan}
           scanLoading={scanLoading} scanResults={scanResults} scanError={scanError} scanTotal={scanTotal}
           hasLlmKey={hasLlmKey}
+          hasEtoroConfigured={hasEtoroConfigured}
+          handlePlaceEtoroOrder={handlePlaceEtoroOrder}
         />
       )}
     </div>
@@ -513,13 +518,20 @@ function fmtPrice(v: unknown): string | null {
 const ALL_ASSET_TYPES = ['stock', 'etf', 'commodity', 'crypto'] as const;
 const SCAN_COUNT_OPTIONS = [3, 5, 10, 15, 20] as const;
 
-function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoading, scanResults, scanError, scanTotal, hasLlmKey }: {
+function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoading, scanResults, scanError, scanTotal, hasLlmKey, hasEtoroConfigured, handlePlaceEtoroOrder }: {
   t: (key: string) => string; locale: string;
-  handleMarketScan: (count: number, assetTypes: string[]) => void; handleStopScan: () => void;
+  handleMarketScan: (count: number, assetTypes: string[], etoroOnly?: boolean) => void; handleStopScan: () => void;
   scanLoading: boolean; scanResults: MarketScanResult[] | null; scanError: string | null; scanTotal: number; hasLlmKey: boolean;
+  hasEtoroConfigured: boolean;
+  handlePlaceEtoroOrder: (symbol: string, amount: number, isBuy: boolean) => Promise<void>;
 }) {
   const [scanCount, setScanCount] = useState<number>(5);
   const [scanAssetTypes, setScanAssetTypes] = useState<string[]>([...ALL_ASSET_TYPES]);
+  const [etoroOnly, setEtoroOnly] = useState(false);
+  const [tradeModal, setTradeModal] = useState<{ symbol: string; name: string; isBuy: boolean } | null>(null);
+  const [tradeAmount, setTradeAmount] = useState('');
+  const [tradeSubmitting, setTradeSubmitting] = useState(false);
+  const [tradeMessage, setTradeMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
   const toggleAssetType = (type: string) => {
     setScanAssetTypes((prev) => {
@@ -561,6 +573,22 @@ function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoadi
           </div>
         </div>
 
+        {/* Only eToro assets (when eToro configured) */}
+        {hasEtoroConfigured && (
+          <div className="mb-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={etoroOnly}
+                onChange={(e) => setEtoroOnly(e.target.checked)}
+                disabled={scanLoading}
+                className="rounded border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+              />
+              <span className="text-sm text-slate-700 dark:text-slate-300">{t('dashboard.scanOnlyEtoro')}</span>
+            </label>
+          </div>
+        )}
+
         {/* Asset type filter */}
         <div className="mb-5">
           <span className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">{t('dashboard.scanAssetTypeFilter')}</span>
@@ -587,7 +615,7 @@ function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoadi
 
         {/* Scan / Stop buttons */}
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => handleMarketScan(scanCount, scanAssetTypes)} disabled={scanLoading}
+          <button type="button" onClick={() => handleMarketScan(scanCount, scanAssetTypes, etoroOnly)} disabled={scanLoading}
             className="flex-1 sm:flex-none rounded-xl bg-indigo-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm">
             {scanLoading ? t('common.loading') : t('dashboard.scanMarket')}
           </button>
@@ -641,6 +669,23 @@ function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoadi
                   const reason = (locale === 'es' ? item.reasoning_es : item.reasoning_en) || item.reasoning_en || item.reasoning_es || item.reasoning;
                   return reason ? <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 border-t border-slate-100 dark:border-slate-700 pt-2">{reason}</p> : null;
                 })()}
+                {hasEtoroConfigured && (
+                  <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const action = (item.action ?? '').toLowerCase();
+                        const isBuy = !/sell|vender/.test(action);
+                        setTradeModal({ symbol: item.symbol, name: item.name, isBuy });
+                        setTradeAmount('');
+                        setTradeMessage(null);
+                      }}
+                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-700 transition-colors"
+                    >
+                      {t('dashboard.trade')}
+                    </button>
+                  </div>
+                )}
               </div>
             );
           })}
@@ -648,6 +693,59 @@ function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoadi
       )}
       {scanResults && scanResults.length === 0 && !scanError && (
         <p className="text-sm text-slate-500 dark:text-slate-400">{t('dashboard.scanEmpty')}</p>
+      )}
+
+      {/* Trade modal */}
+      {tradeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={() => !tradeSubmitting && setTradeModal(null)}>
+          <div className="cb-card p-5 w-full max-w-sm shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-2">{t('dashboard.trade')}: {tradeModal.symbol}</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">{tradeModal.name}</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">{tradeModal.isBuy ? t('dashboard.actionBuy') : t('dashboard.actionSell')}</p>
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">{t('dashboard.tradeAmount')}</label>
+            <input
+              type="number"
+              min={1}
+              step={1}
+              value={tradeAmount}
+              onChange={(e) => setTradeAmount(e.target.value)}
+              placeholder={t('dashboard.tradeAmountPlaceholder')}
+              className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 mb-4"
+            />
+            {tradeMessage && (
+              <p className={`text-sm mb-3 ${tradeMessage.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                {tradeMessage.text}
+              </p>
+            )}
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => !tradeSubmitting && setTradeModal(null)} className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors" disabled={tradeSubmitting}>
+                {t('common.cancel')}
+              </button>
+              <button
+                type="button"
+                disabled={tradeSubmitting || !tradeAmount || Number(tradeAmount) <= 0}
+                onClick={async () => {
+                  const amount = Number(tradeAmount);
+                  if (!Number.isFinite(amount) || amount <= 0) return;
+                  setTradeSubmitting(true);
+                  setTradeMessage(null);
+                  try {
+                    await handlePlaceEtoroOrder(tradeModal.symbol, amount, tradeModal.isBuy);
+                    setTradeMessage({ type: 'success', text: t('dashboard.orderSuccess') });
+                    setTimeout(() => setTradeModal(null), 1500);
+                  } catch (e) {
+                    setTradeMessage({ type: 'error', text: e instanceof Error ? e.message : t('dashboard.orderError') });
+                  } finally {
+                    setTradeSubmitting(false);
+                  }
+                }}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {tradeSubmitting ? t('common.loading') : t('dashboard.trade')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </>
   );

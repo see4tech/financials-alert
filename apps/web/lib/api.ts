@@ -159,8 +159,8 @@ export async function saveLlmSettings(
   return res.json();
 }
 
-// ── User preferences (locale, theme) ──
-export async function getUserPreferences(accessToken: string): Promise<{ locale: string; theme: string }> {
+// ── User preferences (locale, theme, etoro_trading_mode) ──
+export async function getUserPreferences(accessToken: string): Promise<{ locale: string; theme: string; etoro_trading_mode: string }> {
   const res = await fetch(`${API_BASE}/api/user/preferences`, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -170,9 +170,44 @@ export async function getUserPreferences(accessToken: string): Promise<{ locale:
 
 export async function saveUserPreferences(
   accessToken: string,
-  payload: { locale?: string; theme?: string },
-): Promise<{ locale?: string; theme?: string; saved: boolean }> {
+  payload: { locale?: string; theme?: string; etoro_trading_mode?: string },
+): Promise<{ locale?: string; theme?: string; etoro_trading_mode?: string; saved: boolean }> {
   const res = await fetch(`${API_BASE}/api/user/preferences`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(payload),
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+// ── eToro settings (no secrets returned) ──
+export async function getEtoroSettings(accessToken: string): Promise<{ configured: boolean }> {
+  const res = await fetch(`${API_BASE}/api/user/etoro-settings`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+export async function saveEtoroSettings(
+  accessToken: string,
+  payload: { apiKey: string; userKey: string },
+): Promise<{ saved: boolean }> {
+  const res = await fetch(`${API_BASE}/api/user/etoro-settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify({ apiKey: payload.apiKey, userKey: payload.userKey }),
+  });
+  await throwOnNotOk(res);
+  return res.json();
+}
+
+export async function placeEtoroOrder(
+  accessToken: string,
+  payload: { symbol: string; amount: number; isBuy: boolean },
+): Promise<{ ok: boolean; orderId?: string }> {
+  const res = await fetch(`${API_BASE}/api/etoro/order`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
     body: JSON.stringify(payload),
@@ -248,10 +283,12 @@ export async function fetchMarketScan(
   count = 5,
   assetTypes?: string[],
   exclude?: string[],
+  etoroOnly?: boolean,
 ): Promise<{ scan: MarketScanResult[] }> {
   const payload: Record<string, unknown> = { locale, count };
   if (assetTypes && assetTypes.length > 0) payload.assetTypes = assetTypes;
   if (exclude && exclude.length > 0) payload.exclude = exclude;
+  if (etoroOnly === true) payload.etoroOnly = true;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 55000); // 55s client timeout
   let res: Response;

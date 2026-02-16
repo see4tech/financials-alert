@@ -6,7 +6,7 @@ import { useLocale } from '@/app/context/LocaleContext';
 import { useTheme, type Theme } from '@/app/context/ThemeContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
 import { useSupabaseAuthReady } from '@/app/context/SupabaseAuthContext';
-import { getLlmSettings, saveLlmSettings } from '@/lib/api';
+import { getLlmSettings, saveLlmSettings, getEtoroSettings, saveEtoroSettings, getUserPreferences, saveUserPreferences } from '@/lib/api';
 
 const PROVIDERS = [
   { value: 'openai', labelKey: 'settings.llmProviderOpenAI' },
@@ -61,6 +61,10 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [etoroApiKey, setEtoroApiKey] = useState('');
+  const [etoroUserKey, setEtoroUserKey] = useState('');
+  const [etoroTradingMode, setEtoroTradingMode] = useState<'demo' | 'real'>('demo');
+  const [etoroSaving, setEtoroSaving] = useState(false);
 
   const loadSettings = useCallback(async () => {
     const client = getSupabaseBrowser();
@@ -78,6 +82,13 @@ export default function SettingsPage() {
       setProvider(data.provider ?? 'openai');
       setHasKey(data.hasKey);
       setApiKey('');
+      const prefs = await getUserPreferences(session.access_token);
+      setEtoroTradingMode((prefs.etoro_trading_mode === 'real' ? 'real' : 'demo'));
+      const etoro = await getEtoroSettings(session.access_token);
+      if (etoro.configured) {
+        setEtoroApiKey('');
+        setEtoroUserKey('');
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -206,6 +217,107 @@ export default function SettingsPage() {
             {saving ? t('common.loading') : t('settings.save')}
           </button>
         </form>
+      </section>
+
+      {/* eToro settings */}
+      <section className="cb-card p-5 mt-6">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-slate-100 mb-3">{t('settings.etoroSectionTitle')}</h2>
+        <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">{t('settings.etoroSectionHint')}</p>
+        <div className="space-y-4">
+          <div>
+            <label htmlFor="etoro-api-key" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              {t('settings.etoroApiKey')}
+            </label>
+            <input
+              id="etoro-api-key"
+              type="password"
+              value={etoroApiKey}
+              onChange={(e) => setEtoroApiKey(e.target.value)}
+              placeholder={t('settings.etoroApiKeyPlaceholder')}
+              className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              autoComplete="off"
+            />
+          </div>
+          <div>
+            <label htmlFor="etoro-user-key" className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
+              {t('settings.etoroUserKey')}
+            </label>
+            <input
+              id="etoro-user-key"
+              type="password"
+              value={etoroUserKey}
+              onChange={(e) => setEtoroUserKey(e.target.value)}
+              placeholder={t('settings.etoroUserKeyPlaceholder')}
+              className="w-full border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              autoComplete="off"
+            />
+          </div>
+          <button
+            type="button"
+            disabled={etoroSaving || !etoroApiKey.trim() || !etoroUserKey.trim()}
+            onClick={async () => {
+              const client = getSupabaseBrowser();
+              if (!client) return;
+              const { data: { session } } = await client.auth.getSession();
+              if (!session?.access_token) return;
+              setEtoroSaving(true);
+              setError(null);
+              try {
+                await saveEtoroSettings(session.access_token, { apiKey: etoroApiKey.trim(), userKey: etoroUserKey.trim() });
+                setEtoroApiKey('');
+                setEtoroUserKey('');
+                setSuccess(t('settings.etoroSaved'));
+              } catch (e) {
+                setError(e instanceof Error ? e.message : String(e));
+              } finally {
+                setEtoroSaving(false);
+              }
+            }}
+            className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 transition-colors shadow-sm"
+          >
+            {etoroSaving ? t('common.loading') : t('settings.save')}
+          </button>
+          <div className="pt-3 border-t border-slate-200 dark:border-slate-600">
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">{t('settings.etoroTradingAccount')}</label>
+            <div className="flex gap-4">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="etoro-mode"
+                  checked={etoroTradingMode === 'demo'}
+                  onChange={() => {
+                    setEtoroTradingMode('demo');
+                    const client = getSupabaseBrowser();
+                    if (!client) return;
+                    client.auth.getSession().then(({ data: { session } }) => {
+                      if (session?.access_token) saveUserPreferences(session.access_token, { etoro_trading_mode: 'demo' });
+                    });
+                  }}
+                  className="rounded-full border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-slate-700 dark:text-slate-300">{t('settings.etoroDemo')}</span>
+              </label>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="etoro-mode"
+                  checked={etoroTradingMode === 'real'}
+                  onChange={() => {
+                    setEtoroTradingMode('real');
+                    const client = getSupabaseBrowser();
+                    if (!client) return;
+                    client.auth.getSession().then(({ data: { session } }) => {
+                      if (session?.access_token) saveUserPreferences(session.access_token, { etoro_trading_mode: 'real' });
+                    });
+                  }}
+                  className="rounded-full border-slate-300 dark:border-slate-600 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-sm text-slate-700 dark:text-slate-300">{t('settings.etoroReal')}</span>
+              </label>
+            </div>
+            <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">{t('settings.etoroRealWarning')}</p>
+          </div>
+        </div>
       </section>
     </main>
   );

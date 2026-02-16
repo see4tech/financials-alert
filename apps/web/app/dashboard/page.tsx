@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale } from '@/app/context/LocaleContext';
 import { getSupabaseBrowser } from '@/lib/supabase';
-import { fetchDashboard, fetchScoreHistory, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, fetchMarketScan, getLlmSettings, runJobStep, runJobFinalize, getIndicatorKeys, type AiRecommendation, type MarketScanResult } from '@/lib/api';
+import { fetchDashboard, fetchScoreHistory, triggerBackfillHistory, triggerPopulateSymbols, fetchRecommendations, fetchMarketScan, getLlmSettings, getEtoroSettings, placeEtoroOrder, runJobStep, runJobFinalize, getIndicatorKeys, type AiRecommendation, type MarketScanResult } from '@/lib/api';
 import { DashboardContent } from './DashboardContent';
 import { DashboardErrorView } from './DashboardErrorView';
 
@@ -45,6 +45,7 @@ export default function DashboardPage() {
   const [aiRecommendations, setAiRecommendations] = useState<AiRecommendation[] | null>(null);
   const [recsError, setRecsError] = useState<string | null>(null);
   const [hasLlmKey, setHasLlmKey] = useState(false);
+  const [hasEtoroConfigured, setHasEtoroConfigured] = useState(false);
   const [populateLoading, setPopulateLoading] = useState(false);
   const [populateSuccess, setPopulateSuccess] = useState<string | null>(null);
   const [populateError, setPopulateError] = useState<string | null>(null);
@@ -85,6 +86,9 @@ export default function DashboardPage() {
       if (!session?.access_token) return;
       getLlmSettings(session.access_token)
         .then((s) => setHasLlmKey(s.hasKey))
+        .catch(() => {});
+      getEtoroSettings(session.access_token)
+        .then((s) => setHasEtoroConfigured(s.configured))
         .catch(() => {});
     });
   }, []);
@@ -243,7 +247,7 @@ export default function DashboardPage() {
     }
   }, [locale]);
 
-  const handleMarketScan = useCallback(async (count: number, assetTypes: string[]) => {
+  const handleMarketScan = useCallback(async (count: number, assetTypes: string[], etoroOnly?: boolean) => {
     const client = getSupabaseBrowser();
     if (!client) return;
     const { data: { session } } = await client.auth.getSession();
@@ -263,7 +267,7 @@ export default function DashboardPage() {
       while (remaining > 0 && !scanCancelledRef.current) {
         const batchSize = Math.min(BATCH, remaining);
         const excludeSymbols = accumulated.map((r) => r.symbol);
-        const result = await fetchMarketScan(session.access_token, locale, batchSize, assetTypes, excludeSymbols);
+        const result = await fetchMarketScan(session.access_token, locale, batchSize, assetTypes, excludeSymbols, etoroOnly);
         console.log('[market-scan] batch response:', JSON.stringify(result));
         const items = result.scan || [];
         if (items.length === 0) break; // no more candidates
@@ -285,6 +289,14 @@ export default function DashboardPage() {
 
   const handleStopScan = useCallback(() => {
     scanCancelledRef.current = true;
+  }, []);
+
+  const handlePlaceEtoroOrder = useCallback(async (symbol: string, amount: number, isBuy: boolean) => {
+    const client = getSupabaseBrowser();
+    if (!client) throw new Error('Not authenticated');
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.access_token) throw new Error('Not authenticated');
+    return placeEtoroOrder(session.access_token, { symbol, amount, isBuy });
   }, []);
 
   if (loading) return <div className="pt-16 p-8 pb-24 md:pb-8 text-slate-500 dark:text-slate-400">{t('common.loading')}</div>;
@@ -349,5 +361,7 @@ export default function DashboardPage() {
     scanResults={scanResults}
     scanError={scanError}
     scanTotal={scanTotal}
+    hasEtoroConfigured={hasEtoroConfigured}
+    handlePlaceEtoroOrder={handlePlaceEtoroOrder}
   />;
 }
