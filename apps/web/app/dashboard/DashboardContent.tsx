@@ -669,13 +669,13 @@ function ScannerSection({ t, locale, handleMarketScan, handleStopScan, scanLoadi
                   const reason = (locale === 'es' ? item.reasoning_es : item.reasoning_en) || item.reasoning_en || item.reasoning_es || item.reasoning;
                   return reason ? <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 border-t border-slate-100 dark:border-slate-700 pt-2">{reason}</p> : null;
                 })()}
-                {hasEtoroConfigured && (
+                {hasEtoroConfigured && /buy|comprar|sell|vender/i.test(item.action ?? '') && (
                   <div className="mt-3 pt-2 border-t border-slate-100 dark:border-slate-700">
                     <button
                       type="button"
                       onClick={() => {
                         const action = (item.action ?? '').toLowerCase();
-                        const isBuy = !/sell|vender/.test(action);
+                        const isBuy = /buy|comprar/.test(action);
                         setTradeModal({ symbol: item.symbol, name: item.name, isBuy });
                         setTradeAmount('');
                         setTradeMessage(null);

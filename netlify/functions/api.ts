@@ -145,7 +145,7 @@ async function etoroResolveSymbol(apiKey: string, userKey: string, symbol: strin
   const items = data?.items ?? [];
   const upper = symbol.trim().toUpperCase();
   const match = items.find((i) => (i.internalSymbolFull ?? '').toUpperCase() === upper);
-  return match?.instrumentId ?? (items[0]?.instrumentId ?? null);
+  return match != null && match.instrumentId != null ? match.instrumentId : null;
 }
 
 /** Place eToro market order (open by amount). Amount in USD. demo: use demo endpoint. */
